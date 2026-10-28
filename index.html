@@ -8,6 +8,17 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="bamboo" x1="0" x2="1"><stop offset="0" stop-color="#6f4220"/><stop offset=".45" stop-color="#d4a05a"/><stop offset="1" stop-color="#7f5126"/></linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3e8cf"/><stop offset="1" stop-color="#bba67c"/></linearGradient>
+    <linearGradient id="ferrule" x1="0" x2="1"><stop offset="0" stop-color="#1c1a18"/><stop offset=".5" stop-color="#4a4640"/><stop offset="1" stop-color="#1c1a18"/></linearGradient>
+    <linearGradient id="stoneTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a2a"/><stop offset="1" stop-color="#171717"/></linearGradient>
+    <linearGradient id="stoneFront" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1b1b"/><stop offset="1" stop-color="#090909"/></linearGradient>
+    <radialGradient id="inkPool" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#1d1d1d"/><stop offset="1" stop-color="#000"/></radialGradient>
+    <clipPath id="tipClip"><rect x="0" y="184" width="44" height="46"/></clipPath>
+  </defs>
+</svg>
 <header class="topbar">
   <span class="brand"><b>墨</b>阿黑的客字繪卷</span>
   <span class="topbar-sub">毛筆描寫・獨立試玩</span>
@@ -46,9 +57,27 @@
       <div class="paper">
         <canvas id="paper" width="512" height="512" aria-label="毛筆描寫區，按住滑鼠或用手指拖曳描字"></canvas>
         <span id="paperHint">先點墨硯，再開始下筆</span>
+        <div id="brush" class="brush" data-brush aria-hidden="true"></div>
       </div>
       <aside class="tools">
-        <button id="ink" class="inkstone" type="button" disabled><span>墨</span><b>沾墨開始</b></button>
+        <button id="ink" class="inkstone" type="button" disabled aria-label="墨硯：點一下沾墨">
+          <span class="stone-wrap">
+            <svg class="stone" viewBox="0 0 240 170" aria-hidden="true" focusable="false">
+              <ellipse cx="120" cy="152" rx="106" ry="12" fill="rgba(40,25,10,.3)"/>
+              <path d="M12 84 H228 V130 Q228 142 216 142 H24 Q12 142 12 130 Z" fill="url(#stoneFront)"/>
+              <path d="M32 26 H208 Q220 26 224 38 L232 84 H8 L16 38 Q20 26 32 26 Z" fill="url(#stoneTop)" stroke="#444" stroke-width="2"/>
+              <path d="M44 38 H196 L204 76 H36 Z" fill="none" stroke="#2e2e2e" stroke-width="2"/>
+              <path d="M128 46 H198 L202 70 H124 Z" fill="#262626"/>
+              <path d="M136 54 L176 52 M134 60 L190 58 M132 66 L186 64" stroke="#3a3a3a" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              <rect x="48" y="44" width="64" height="30" rx="7" fill="#020202" stroke="#555" stroke-width="1.5"/>
+              <rect x="52" y="48" width="56" height="22" rx="5" fill="url(#inkPool)"/>
+              <ellipse cx="68" cy="54" rx="14" ry="2.8" fill="#fff" opacity=".2"/>
+              <ellipse class="ripple" cx="80" cy="60" rx="9" ry="3.5" fill="none" stroke="#8a8a8a" stroke-width="1.5"/>
+            </svg>
+            <span class="dip-brush" data-brush></span>
+          </span>
+          <b id="inkLabel">沾墨開始</b>
+        </button>
         <p id="inkInfo">五字共補墨一次</p>
         <button id="undo" type="button" disabled>撤回一筆</button>
         <button id="clear" type="button" disabled>重寫這個字</button>

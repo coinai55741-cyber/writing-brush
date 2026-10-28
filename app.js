@@ -70,6 +70,7 @@ function render() {
   ctx.stroke(); ctx.setLineDash([]);
   ctx.globalAlpha = .18; ctx.drawImage(target(), 0, 0); ctx.globalAlpha = 1;
   for (const s of strokes) paintStroke(ctx, s);
+  brush.classList.toggle('inked', inked);
   $('undo').disabled = !strokes.length || !!active;
   $('clear').disabled = !strokes.length || !!active;
   $('next').disabled = !strokes.length || !!active || !inked;
@@ -107,7 +108,7 @@ async function loadQuestion() {
     $('source').textContent = `${names[$('dialect').value]} · 第 ${question.level} 級 · ${question.category}`;
     $('status').textContent = `本腔調有 ${pool.length} 道五字題。先聽音檔，再點墨硯開始計時。`;
     $('paperHint').textContent = '先點墨硯，再開始下筆';
-    $('ink').innerHTML = '<span>墨</span><b>沾墨開始</b>';
+    $('inkLabel').textContent = '沾墨開始';
     $('inkInfo').textContent = '第三字完成後補墨一次';
     $('ink').disabled = false; $('audio').disabled = false;
     render();
@@ -128,11 +129,58 @@ $('ink').onclick = () => {
   if (!started) { started = performance.now(); $('drawQuestion').disabled = true; $('dialect').disabled = true; tick(); }
   else refilled = true;
   $('ink').disabled = true;
-  $('ink').innerHTML = '<span>墨</span><b>墨已備好</b>';
+  dipBrush();
+  $('inkLabel').textContent = '墨已備好';
   $('paperHint').textContent = '按住描寫，放開收筆';
   $('status').textContent = refilled ? '墨已補滿，繼續完成後兩字。' : '可以下筆了。慢寫稍粗、快寫稍細。';
   render();
 };
+
+/* ==========================================================================
+   毛筆圖象：跟著游標／手指，筆尖落在描寫位置。
+   沒沾墨時筆毛是淺色，沾墨後筆尖變黑；下筆時依筆寬讓筆尖張開或收攏。
+   ========================================================================== */
+const BRUSH_SVG = `<svg viewBox="0 0 44 230" aria-hidden="true" focusable="false">
+  <rect x="17" y="2" width="10" height="152" rx="5" fill="url(#bamboo)"/>
+  <rect x="16" y="0" width="12" height="9" rx="4.5" fill="#3f2512"/>
+  <rect x="16.5" y="44" width="11" height="3" rx="1.5" fill="#5a3718" opacity=".55"/>
+  <rect x="16.5" y="104" width="11" height="3" rx="1.5" fill="#5a3718" opacity=".55"/>
+  <rect x="15" y="150" width="14" height="16" rx="3" fill="url(#ferrule)"/>
+  <g class="bristles">
+    <path d="M15 164 C11 192 16 214 22 229 C28 214 33 192 29 164 Z" fill="url(#hair)"/>
+    <path class="ink-part" clip-path="url(#tipClip)" d="M15 164 C11 192 16 214 22 229 C28 214 33 192 29 164 Z" fill="#16130f"/>
+    <path d="M19 170 C18 192 20 210 22 222" stroke="#fff" stroke-opacity=".28" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>`;
+document.querySelectorAll('[data-brush]').forEach(el => { el.innerHTML = BRUSH_SVG; });
+const brush = $('brush');
+
+function moveBrush(e) {
+  const r = paper.getBoundingClientRect();
+  let spread = 1;
+  if (active === e.pointerId) {
+    const s = strokes[strokes.length - 1];
+    spread = .55 + (Math.min(23, Math.max(6, s[s.length - 1].w)) - 6) / 17 * .9;
+  }
+  brush.style.setProperty('--x', (e.clientX - r.left) + 'px');
+  brush.style.setProperty('--y', (e.clientY - r.top) + 'px');
+  brush.style.setProperty('--s', (r.width / 512 * .9).toFixed(3));
+  brush.style.setProperty('--spread', spread.toFixed(2));
+  brush.classList.add('show');
+  paper.parentElement.classList.add('has-brush');
+}
+function hideBrush() { brush.classList.remove('show'); paper.parentElement.classList.remove('has-brush'); }
+paper.addEventListener('pointerenter', moveBrush);
+paper.addEventListener('pointermove', moveBrush);
+paper.addEventListener('pointerdown', moveBrush);
+paper.addEventListener('pointerleave', () => { if (active === null) hideBrush(); });
+paper.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') hideBrush(); });
+paper.addEventListener('pointercancel', hideBrush);
+
+function dipBrush() {
+  const b = $('ink');
+  b.classList.remove('is-dip'); void b.offsetWidth; b.classList.add('is-dip');
+}
 
 function point(e) {
   const r = paper.getBoundingClientRect();
@@ -181,7 +229,7 @@ $('next').onclick = () => {
   index++; strokes = [];
   if (index === 3 && !refilled) {
     inked = false; $('ink').disabled = false;
-    $('ink').innerHTML = '<span>墨</span><b>再沾一次墨</b>';
+    $('inkLabel').textContent = '再沾一次墨';
     $('paperHint').textContent = '前三字完成，點墨硯補墨';
     $('status').textContent = '補一次墨，再完成後兩字；計時持續中。';
   } else $('status').textContent = `正在描第 ${index + 1} 個字。`;
