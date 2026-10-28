@@ -5,7 +5,7 @@ const paper = $('paper'), ctx = paper.getContext('2d');
 const makeCanvas = () => { const c = document.createElement('canvas'); c.width = c.height = 512; return c; };
 let question, chars = [], index = 0, strokes = [], saved = [], started = 0, ended = 0, active = null;
 let inked = false, refilled = false, loading = false, loadToken = 0, shareFile = null;
-let score = 0, feedback = '', timerId = 0;
+let score = 0, feedback = '', timerId = 0, stamp = null;
 const audio = new Audio();
 const clean = s => Array.from(s.replace(/[\p{P}\p{Z}\s]/gu, ''));
 const time = ms => {
@@ -24,6 +24,74 @@ const FEEDBACK_LINES = {
   low: ['五個字完成了！下次把漏掉的筆畫再補齊。']
 };
 const pick = list => list[Math.floor(Math.random() * list.length)];
+
+/* ==========================================================================
+   作品紀念章：依描寫得分分五階段，各有不同章名與印章造型。
+   門檻為暫定值（計分尚未用真實學生作品校準），之後只需要改這張表。
+   style：circle 單線圓章／square 方章／double 雙線方章／cloud 雲紋邊方章／gold 金邊雙框章
+   ========================================================================== */
+const STAMPS = [
+  { min: 9,   name: '墨韻客家', line: '字裡有客家的味道',   style: 'gold' },
+  { min: 7.5, name: '落筆生輝', line: '每一筆都有精神',     style: 'cloud' },
+  { min: 6,   name: '運筆漸穩', line: '筆畫愈來愈穩',       style: 'double' },
+  { min: 4,   name: '墨字初成', line: '字形出來了',         style: 'square' },
+  { min: 0,   name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' }
+];
+const stampFor = value => STAMPS.find(st => value >= st.min);
+
+/* 印章：白文（紅底鏤空字），金章為金字。以章名為種子加上固定的斑駁，每次畫出來都一樣。 */
+function drawStamp(g, cx, cy, size, st) {
+  const S = 240, RED = '#c23b2a', GOLD = '#c9962b';
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const k = c.getContext('2d');
+  const rr = (x, y, w, h, r) => { k.beginPath(); k.roundRect(x, y, w, h, r); };
+  const cut = fn => { k.save(); k.globalCompositeOperation = 'destination-out'; fn(); k.restore(); };
+  const chars = Array.from(st.name);
+  const round = st.style === 'circle';
+  k.fillStyle = k.strokeStyle = RED;
+
+  if (round) {
+    k.beginPath(); k.arc(120, 120, 96, 0, Math.PI * 2); k.fill();
+    cut(() => { k.lineWidth = 3; k.beginPath(); k.arc(120, 120, 86, 0, Math.PI * 2); k.stroke(); });
+  } else if (st.style === 'square') {
+    rr(24, 24, 192, 192, 14); k.fill();
+    cut(() => { k.lineWidth = 3; rr(33, 33, 174, 174, 8); k.stroke(); });
+  } else if (st.style === 'double') {
+    k.lineWidth = 6; rr(22, 22, 196, 196, 12); k.stroke();
+    rr(36, 36, 168, 168, 8); k.fill();
+    cut(() => { k.lineWidth = 2.5; rr(44, 44, 152, 152, 5); k.stroke(); });
+  } else if (st.style === 'cloud') {
+    rr(24, 24, 192, 192, 8); k.fill();
+    cut(() => {
+      for (let t = 40; t <= 200; t += 20) {
+        for (const [x, y] of [[t, 24], [t, 216], [24, t], [216, t]]) { k.beginPath(); k.arc(x, y, 6.5, 0, Math.PI * 2); k.fill(); }
+      }
+      k.lineWidth = 3; rr(38, 38, 164, 164, 4); k.stroke();
+    });
+  } else {
+    k.strokeStyle = GOLD; k.lineWidth = 7; rr(21, 21, 198, 198, 14); k.stroke();
+    k.lineWidth = 2; rr(32, 32, 176, 176, 8); k.stroke();
+    k.fillStyle = RED; rr(38, 38, 164, 164, 6); k.fill();
+    k.fillStyle = GOLD;
+    for (const [x, y] of [[50, 50], [190, 50], [50, 190], [190, 190]]) { k.beginPath(); k.arc(x, y, 4.5, 0, Math.PI * 2); k.fill(); }
+  }
+
+  /* 章名：由左至右、由上而下，兩字一行（沿用現代讀法，方便閱讀） */
+  const fs = round ? 54 : st.style === 'gold' ? 62 : 70, dx = round ? 30 : st.style === 'gold' ? 36 : 38, dy = dx;
+  const pos = [[120 - dx, 120 - dy], [120 + dx, 120 - dy], [120 - dx, 120 + dy], [120 + dx, 120 + dy]];
+  k.font = `900 ${fs}px Hakka, "Microsoft JhengHei", sans-serif`; k.textAlign = 'center'; k.textBaseline = 'middle';
+  const drawChars = () => chars.forEach((ch, i) => k.fillText(ch, pos[i][0], pos[i][1] + 3));
+  if (st.style === 'gold') { k.fillStyle = '#f6dc90'; drawChars(); } else cut(drawChars);
+
+  /* 斑駁：固定亂數，讓同一個章每次一致 */
+  let seed = Array.from(st.name).reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7) >>> 0;
+  const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  cut(() => { for (let i = 0; i < 46; i++) { k.beginPath(); k.arc(24 + rnd() * 192, 24 + rnd() * 192, .6 + rnd() * 1.5, 0, Math.PI * 2); k.fill(); } });
+
+  g.save(); g.translate(cx, cy); g.rotate(-5 * Math.PI / 180);
+  g.drawImage(c, -size / 2, -size / 2, size, size);
+  g.restore();
+}
 
 /* ==========================================================================
    描寫
@@ -148,8 +216,8 @@ const BRUSH_SVG = `<svg viewBox="0 0 44 230" aria-hidden="true" focusable="false
   <rect x="15" y="150" width="14" height="16" rx="3" fill="url(#ferrule)"/>
   <g class="bristles">
     <path d="M15 164 C11 192 16 214 22 229 C28 214 33 192 29 164 Z" fill="url(#hair)"/>
-    <path class="ink-part" clip-path="url(#tipClip)" d="M15 164 C11 192 16 214 22 229 C28 214 33 192 29 164 Z" fill="#16130f"/>
-    <path d="M19 170 C18 192 20 210 22 222" stroke="#fff" stroke-opacity=".28" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <path class="ink-part" d="M15 164 C11 192 16 214 22 229 C28 214 33 192 29 164 Z" fill="#16130f"/>
+    <path d="M19 170 C18 192 20 210 22 222" stroke="#fff" stroke-opacity=".1" stroke-width="1.2" fill="none" stroke-linecap="round"/>
   </g>
 </svg>`;
 document.querySelectorAll('[data-brush]').forEach(el => { el.innerHTML = BRUSH_SVG; });
@@ -248,6 +316,12 @@ function finish() {
   $('artwork').replaceChildren(...saved.map(s => { const c = makeCanvas(); c.getContext('2d').drawImage(s.canvas, 0, 0); return c; }));
   $('resultSentence').textContent = question.hakka_hanji;
   $('resultMeaning').textContent = question.chinese_sentence || '';
+  stamp = stampFor(score);
+  $('stampName').textContent = stamp.name;
+  $('stampLine').textContent = stamp.line;
+  const sc = $('stamp'), sg = sc.getContext('2d');
+  sg.clearRect(0, 0, sc.width, sc.height);
+  drawStamp(sg, 120, 120, 220, stamp);
   drawCard();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -255,19 +329,13 @@ function finish() {
 /* ==========================================================================
    分享文案
    ========================================================================== */
-function url() {
-  const s = $('shareUrl').value.trim();
-  if (!s) return '';
-  try { const u = new URL(s); return u.protocol === 'https:' ? u.href : ''; } catch { return ''; }
-}
 function caption() {
   return [
     '我用毛筆學客語！',
     `【${names[$('dialect').value]}】${question.hakka_hanji}`,
     question.chinese_sentence || '',
     `描寫 ${score.toFixed(2)} / 10 分 · ${time(ended - started)}`,
-    feedback,
-    url()
+    feedback
   ].filter(Boolean).join('\n');
 }
 
@@ -298,30 +366,33 @@ async function drawCard() {
   g.strokeStyle = '#e0d4bb'; g.lineWidth = 2; g.strokeRect(75, 360, 930, 250);
   saved.forEach((s, i) => g.drawImage(s.canvas, 85 + i * 182, 394, 182, 182));
 
-  g.fillStyle = '#3b3a2d'; g.font = '40px Hakka'; g.fillText(question.hakka_hanji, 540, 696, 900);
-  g.fillStyle = '#55574a'; g.font = '27px Hakka'; g.fillText(question.chinese_sentence || '', 540, 750, 900);
+  g.fillStyle = '#3b3a2d'; g.font = '40px Hakka'; g.fillText(question.hakka_hanji, 540, 684, 900);
+  g.fillStyle = '#55574a'; g.font = '27px Hakka'; g.fillText(question.chinese_sentence || '', 540, 736, 900);
 
-  g.fillStyle = '#e7e5d4'; g.fillRect(90, 810, 900, 210);
+  g.fillStyle = '#e7e5d4'; g.fillRect(90, 790, 900, 205);
   g.fillStyle = '#78664a'; g.font = '22px Hakka';
-  g.fillText('描寫得分', 315, 862); g.fillText('描寫時間', 765, 862);
-  g.strokeStyle = '#c9bfa5'; g.lineWidth = 2; g.beginPath(); g.moveTo(540, 845); g.lineTo(540, 925); g.stroke();
+  g.fillText('描寫得分', 315, 842); g.fillText('描寫時間', 765, 842);
+  g.strokeStyle = '#c9bfa5'; g.lineWidth = 2; g.beginPath(); g.moveTo(540, 825); g.lineTo(540, 905); g.stroke();
   g.fillStyle = '#355b4d'; g.font = '52px Hakka';
-  g.fillText(`${score.toFixed(2)} / 10`, 315, 922); g.fillText(time(ended - started), 765, 922);
-  g.fillStyle = '#3b3a2d'; g.font = '27px Hakka'; g.fillText(feedback, 540, 988, 840);
+  g.fillText(`${score.toFixed(2)} / 10`, 315, 902); g.fillText(time(ended - started), 765, 902);
+  g.fillStyle = '#3b3a2d'; g.font = '27px Hakka'; g.fillText(feedback, 540, 968, 840);
 
-  g.fillStyle = '#355b4d'; g.font = '40px Hakka'; g.fillText('你也來玩玩看吧！', 540, 1150);
-  g.fillStyle = '#78664a'; g.font = '22px Hakka';
-  g.fillText(url() || '獨立試寫成果・非正式競賽成績', 540, 1210, 900);
+  /* 作品紀念章 */
+  drawStamp(g, 270, 1120, 170, stamp);
+  g.textAlign = 'left';
+  g.fillStyle = '#78664a'; g.font = '22px Hakka'; g.fillText('作品紀念章', 400, 1078);
+  g.fillStyle = '#3b3a2d'; g.font = '46px Hakka'; g.fillText(stamp.name, 400, 1136, 560);
+  g.fillStyle = '#55574a'; g.font = '25px Hakka'; g.fillText(stamp.line, 400, 1180, 560);
+  g.textAlign = 'center';
+
+  g.fillStyle = '#355b4d'; g.font = '40px Hakka'; g.fillText('你也來玩玩看吧！', 540, 1255);
+  g.fillStyle = '#78664a'; g.font = '20px Hakka';
+  g.fillText('獨立試寫成果・非正式競賽成績', 540, 1288, 900);
 
   c.toBlob(blob => {
     if (blob && version === cardVersion) shareFile = new File([blob], '阿黑毛筆作品.png', { type: 'image/png' });
   }, 'image/png');
 }
-
-$('shareUrl').oninput = () => {
-  drawCard();
-  $('shareStatus').textContent = $('shareUrl').value && !url() ? '請填入完整的 HTTPS 遊戲網址。' : '';
-};
 
 /* ==========================================================================
    分享動作
@@ -346,39 +417,44 @@ async function copy() {
 }
 $('copy').onclick = copy;
 
-$('download').onclick = () => {
-  if (!shareFile) { $('shareStatus').textContent = '圖片準備中，請稍後再按一次。'; return; }
+function downloadImage() {
   const u = URL.createObjectURL(shareFile), a = document.createElement('a');
   a.href = u; a.download = shareFile.name; a.click();
   setTimeout(() => URL.revokeObjectURL(u), 5000);
-  $('shareStatus').textContent = '作品圖已準備下載，可附在分享貼文裡。';
-};
-
-$('nativeShare').onclick = async () => {
+}
+$('download').onclick = () => {
   if (!shareFile) { $('shareStatus').textContent = '圖片準備中，請稍後再按一次。'; return; }
-  try {
-    if (!navigator.canShare?.({ files: [shareFile] })) { $('shareStatus').textContent = '此瀏覽器不支援圖片分享，請下載作品圖並複製文案。'; return; }
-    copy(); // 同步啟動複製，貼文時可直接貼上
-    await navigator.share({ files: [shareFile], title: '我用毛筆學客語' });
-    $('shareStatus').textContent = '已交給分享介面，文案已複製；是否發文由你決定。';
-  } catch (e) {
-    $('shareStatus').textContent = e.name === 'AbortError' ? '已取消分享，作品仍保留。' : '分享未完成，請下載圖片並複製文案。';
-  }
+  downloadImage();
+  $('shareStatus').textContent = '作品圖已準備下載。';
 };
 
-document.querySelectorAll('[data-platform]').forEach(b => b.onclick = () => {
-  const p = b.dataset.platform;
-  if (p === 'facebook' && !url()) { $('shareStatus').textContent = 'Facebook 分享連結前，請先填入正式遊戲的 HTTPS 網址。圖片可先下載。'; return; }
-  const text = encodeURIComponent(caption());
-  const links = {
-    line: `https://line.me/R/msg/text/?${text}`,
-    threads: `https://www.threads.net/intent/post?text=${text}`,
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url())}`,
-    instagram: 'https://www.instagram.com/'
-  };
-  window.open(links[p], '_blank', 'noopener,noreferrer');
-  copy();
-});
+/* 社群分享：只給圖片，不附文字、不附網址。
+   手機：開啟系統分享面板，只帶圖片。
+   電腦：下載圖片，並開啟該平台（LINE 電腦版沒有網頁入口，只下載）。 */
+const PLATFORMS = {
+  line: { label: 'LINE', open: '' },
+  threads: { label: 'Threads', open: 'https://www.threads.net/' },
+  facebook: { label: 'Facebook', open: 'https://www.facebook.com/' },
+  instagram: { label: 'Instagram', open: 'https://www.instagram.com/' }
+};
+async function shareImageOnly(platform) {
+  if (!shareFile) { $('shareStatus').textContent = '圖片準備中，請稍後再按一次。'; return; }
+  if (navigator.canShare?.({ files: [shareFile] })) {
+    try {
+      await navigator.share({ files: [shareFile] });
+      $('shareStatus').textContent = '已交給分享介面；是否發文由你決定。';
+    } catch (e) {
+      $('shareStatus').textContent = e.name === 'AbortError' ? '已取消分享，作品仍保留。' : '分享未完成，請改用「下載作品圖」。';
+    }
+    return;
+  }
+  const cfg = PLATFORMS[platform];
+  downloadImage();
+  if (cfg && cfg.open) window.open(cfg.open, '_blank', 'noopener,noreferrer');
+  $('shareStatus').textContent = cfg ? `作品圖已下載，在 ${cfg.label} 發文時選這張圖即可。` : '作品圖已下載。';
+}
+$('nativeShare').onclick = () => shareImageOnly('');
+document.querySelectorAll('[data-platform]').forEach(b => b.onclick = () => shareImageOnly(b.dataset.platform));
 
 $('audio').onclick = () => {
   audio.currentTime = 0;

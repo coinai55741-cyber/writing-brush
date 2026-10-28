@@ -16,7 +16,6 @@
     <linearGradient id="stoneTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a2a"/><stop offset="1" stop-color="#171717"/></linearGradient>
     <linearGradient id="stoneFront" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1b1b"/><stop offset="1" stop-color="#090909"/></linearGradient>
     <radialGradient id="inkPool" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#1d1d1d"/><stop offset="1" stop-color="#000"/></radialGradient>
-    <clipPath id="tipClip"><rect x="0" y="184" width="44" height="46"/></clipPath>
   </defs>
 </svg>
 <header class="topbar">
@@ -62,17 +61,19 @@
       <aside class="tools">
         <button id="ink" class="inkstone" type="button" disabled aria-label="墨硯：點一下沾墨">
           <span class="stone-wrap">
-            <svg class="stone" viewBox="0 0 240 170" aria-hidden="true" focusable="false">
-              <ellipse cx="120" cy="152" rx="106" ry="12" fill="rgba(40,25,10,.3)"/>
-              <path d="M12 84 H228 V130 Q228 142 216 142 H24 Q12 142 12 130 Z" fill="url(#stoneFront)"/>
-              <path d="M32 26 H208 Q220 26 224 38 L232 84 H8 L16 38 Q20 26 32 26 Z" fill="url(#stoneTop)" stroke="#444" stroke-width="2"/>
-              <path d="M44 38 H196 L204 76 H36 Z" fill="none" stroke="#2e2e2e" stroke-width="2"/>
-              <path d="M128 46 H198 L202 70 H124 Z" fill="#262626"/>
-              <path d="M136 54 L176 52 M134 60 L190 58 M132 66 L186 64" stroke="#3a3a3a" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-              <rect x="48" y="44" width="64" height="30" rx="7" fill="#020202" stroke="#555" stroke-width="1.5"/>
-              <rect x="52" y="48" width="56" height="22" rx="5" fill="url(#inkPool)"/>
-              <ellipse cx="68" cy="54" rx="14" ry="2.8" fill="#fff" opacity=".2"/>
-              <ellipse class="ripple" cx="80" cy="60" rx="9" ry="3.5" fill="none" stroke="#8a8a8a" stroke-width="1.5"/>
+            <svg class="stone" viewBox="0 0 240 128" aria-hidden="true" focusable="false">
+              <ellipse cx="120" cy="114" rx="108" ry="9" fill="rgba(40,25,10,.28)"/>
+              <path d="M14 92 H226 V107 Q226 112 221 112 H19 Q14 112 14 107 Z" fill="#1b1c1d"/>
+              <path d="M24 14 H216 L226 92 H14 Z" fill="#3a3b3d" stroke="#4b4c4f" stroke-width="1"/>
+              <path d="M14 92 H226" stroke="#58595c" stroke-width="1" opacity=".7"/>
+              <path d="M31 22 H209 L216 84 H22 Z" fill="#2b2c2e"/>
+              <path d="M31 22 H209" stroke="#1f2022" stroke-width="2"/>
+              <path d="M33 24 H99 V82 H24 Z" fill="#050505" stroke="#161617" stroke-width="1.5"/>
+              <path d="M100 22 V84" stroke="#46474a" stroke-width="1.5"/>
+              <path d="M104 24 H208 L214 82 H104 Z" fill="#303134"/>
+              <path d="M205 24 L211 82" stroke="#1d1e20" stroke-width="1.5"/>
+              <ellipse cx="62" cy="34" rx="22" ry="3" fill="#fff" opacity=".06"/>
+              <ellipse class="ripple" cx="66" cy="56" rx="20" ry="8" fill="none" stroke="#8a8a8a" stroke-width="1.5"/>
             </svg>
             <span class="dip-brush" data-brush></span>
           </span>
@@ -99,13 +100,14 @@
     <div class="metrics">
       <div><small>描寫得分</small><strong id="score"></strong></div>
       <div><small>描寫時間</small><strong id="elapsed"></strong></div>
-      <div><small>作品紀念章</small><strong>墨字初成</strong></div>
+      <div><small>作品紀念章</small><strong id="stampName"></strong><em id="stampLine"></em></div>
     </div>
 
     <div class="scroll-card">
       <div id="artwork" class="artwork"></div>
       <h2 id="resultSentence"></h2>
       <p id="resultMeaning" class="meaning"></p>
+      <canvas id="stamp" class="stamp" width="240" height="240" aria-label="作品紀念章"></canvas>
     </div>
 
     <div class="share">
@@ -117,10 +119,6 @@
         <p class="eyebrow">把你的作品帶走</p>
         <h2>我用毛筆學客語</h2>
         <p class="lead">作品為主角，成績與評價一起留在圖卡上。</p>
-
-        <label class="field">邀請遊玩的網址（選填）
-          <input id="shareUrl" type="url" inputmode="url" placeholder="https://…">
-        </label>
 
         <div class="actions">
           <button id="download" type="button" class="primary">↓ 下載作品圖</button>
@@ -139,7 +137,7 @@
         </div>
 
         <p id="shareStatus" role="status"></p>
-        <p class="note">作品紀念章由完成描寫取得。分享獎勵尚未啟用，開啟分享不代表已發文。</p>
+        <p class="note">作品紀念章依描寫得分分為五階段。分享獎勵尚未啟用，開啟分享不代表已發文。</p>
       </div>
     </div>
 
