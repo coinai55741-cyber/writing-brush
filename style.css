@@ -148,6 +148,12 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 .inkstone:hover:not(:disabled) { background: rgba(255, 252, 245, .22); }
 .inkstone:disabled { opacity: 1; cursor: default; }
 .inkstone b { font-size: 14px; }
+.ink-meter { display: block; width: 70%; height: 6px; overflow: hidden; background: rgba(58, 42, 22, .18); border-radius: 3px; }
+.ink-meter i { display: block; width: 0; height: 100%; background: #2a2622; border-radius: 3px; transition: width .12s; }
+.inkstone.needs-ink .stone-wrap { animation: needInk 1.1s ease-in-out infinite; }
+@keyframes needInk { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.tools p.dry { color: #8a3a1a; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .inkstone.needs-ink .stone-wrap { animation: none; } }
 .stone-wrap { position: relative; display: block; width: 100%; aspect-ratio: 240 / 128; }
 .stone { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 5px rgba(50, 30, 10, .35)); }
 .ripple { opacity: 0; transform-box: fill-box; transform-origin: center; }
@@ -190,7 +196,6 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
   --ink: 0; --spread: 1;
 }
 .brush.show { opacity: 1; }
-.brush.inked { --ink: 1; }
 .brush .ink-part { opacity: var(--ink); transition: opacity .25s; }
 .brush .bristles { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleX(var(--spread)); transition: transform .08s; }
 

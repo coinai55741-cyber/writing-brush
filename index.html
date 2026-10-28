@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#355b4d">
 <title>阿黑・墨字小試</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20261028-ink">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -78,6 +78,7 @@
             <span class="dip-brush" data-brush></span>
           </span>
           <b id="inkLabel">沾墨開始</b>
+          <span class="ink-meter" aria-hidden="true"><i id="inkBar"></i></span>
         </button>
         <p id="inkInfo">五字共補墨一次</p>
         <button id="undo" type="button" disabled>撤回一筆</button>
@@ -144,6 +145,6 @@
     <div class="restart-row"><button id="restart" type="button">再描一次</button></div>
   </section>
 </main>
-<script src="app.js"></script>
+<script src="app.js?v=20261028-ink"></script>
 </body>
 </html>

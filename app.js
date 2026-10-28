@@ -103,29 +103,80 @@ function target() {
   return c;
 }
 
+/* ==========================================================================
+   墨量：沾墨後為 1，依筆畫走過的距離遞減（約夠寫三個字），再沾墨歸 1。
+   只影響畫面：墨少時墨色變灰、線條變細，並出現飛白（筆毛沒蓋到的細絲）。
+   計分用固定線寬另外重畫（fixed），不受墨量影響。
+   ========================================================================== */
+const INK_SPAN = 4800;      // 畫布單位：一次沾墨可寫的總長度
+const INK_FLOOR = .1;       // 墨量下限：再乾也看得到筆跡
+const DRY_START = .5;       // 墨量低於這個值開始出現飛白
+let usedBefore = 0;         // 本次沾墨後，已定稿的字用掉的長度
+const pathLen = list => list.reduce((sum, st) => sum + st.reduce((l, p, i) => i ? l + Math.hypot(p.x - st[i - 1].x, p.y - st[i - 1].y) : l, 0), 0);
+const inkLevel = () => Math.max(INK_FLOOR, 1 - (usedBefore + pathLen(strokes)) / INK_SPAN);
+const inkColor = k => {
+  const t = Math.max(0, Math.min(1, k)), mix = (x, y) => Math.round(x + (y - x) * t);
+  return `rgb(${mix(140, 36)},${mix(133, 34)},${mix(120, 29)})`;
+};
+const hash01 = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
+const vnoise = (x, y) => { const i = Math.floor(y), f = y - i, u = f * f * (3 - 2 * f); return hash01(x, i) * (1 - u) + hash01(x, i + 1) * u; };
+
 function paintStroke(g, s, fixed = false) {
   if (!s.length) return;
-  g.strokeStyle = g.fillStyle = '#24221d';
+  g.strokeStyle = g.fillStyle = fixed ? '#24221d' : inkColor(s[0].k ?? 1);
   g.lineCap = g.lineJoin = 'round';
   if (s.length === 1) {
     g.beginPath(); g.arc(s[0].x, s[0].y, fixed ? 10 : 3, 0, Math.PI * 2); g.fill();
     return;
   }
+  if (fixed) {
+    for (let i = 1; i < s.length; i++) {
+      g.lineWidth = 20;
+      g.beginPath(); g.moveTo(s[i - 1].x, s[i - 1].y); g.lineTo(s[i].x, s[i].y); g.stroke();
+    }
+    return;
+  }
+  const seed = s[0].x * .37 + s[0].y * .73, N = 7;
   for (let i = 1; i < s.length; i++) {
-    const a = s[i - 1], b = s[i];
-    g.lineWidth = fixed ? 20 : b.w;
-    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    const a = s[i - 1], b = s[i], k = b.k ?? 1, W = b.w * (.78 + .22 * k);
+    g.strokeStyle = g.fillStyle = inkColor(k);
+    if (k >= DRY_START) {
+      g.lineWidth = W;
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+      continue;
+    }
+    /* 飛白：一筆拆成幾條平行細線，墨越少越多條被跳過；是否跳過由平滑噪聲決定，每條在不同位置斷開，形成絲狀留白 */
+    const miss = (DRY_START - k) / DRY_START * .85;
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+    g.lineWidth = Math.max(1.8, W / N * 2);
+    for (let j = 0; j < N; j++) {
+      if (j !== 3 && vnoise(seed + j * 3.7, i / 9) < miss) continue;
+      const off = (j / (N - 1) - .5) * W * .92;
+      g.beginPath(); g.moveTo(a.x + nx * off, a.y + ny * off); g.lineTo(b.x + nx * off, b.y + ny * off); g.stroke();
+    }
   }
-  if (!fixed) {
-    const p = s[s.length - 1];
-    g.beginPath(); g.arc(p.x, p.y, 2, 0, Math.PI * 2); g.fill();
-  }
+  const p = s[s.length - 1];
+  g.fillStyle = inkColor(p.k ?? 1);
+  g.beginPath(); g.arc(p.x, p.y, 2, 0, Math.PI * 2); g.fill();
 }
 
 function inkCanvas(fixed = false) {
   const c = makeCanvas(), g = c.getContext('2d');
   for (const s of strokes) paintStroke(g, s, fixed);
   return c;
+}
+
+function updateInkUI() {
+  const lvl = inked ? inkLevel() : 0;
+  brush.classList.toggle('inked', inked);
+  brush.style.setProperty('--ink', inked ? (.35 + .65 * lvl).toFixed(2) : 0);
+  $('inkBar').style.width = (lvl * 100).toFixed(0) + '%';
+  $('ink').classList.toggle('needs-ink', !inked && !!started && !ended && !$('ink').disabled);
+  const dry = inked && lvl < .3;
+  $('inkInfo').classList.toggle('dry', dry);
+  if (inked) $('inkInfo').textContent = dry
+    ? (refilled ? '墨快乾了，加油寫完！' : '墨快乾了，寫完第三字再沾墨')
+    : (refilled ? '墨已補滿' : '第三字完成後補墨一次');
 }
 
 function render() {
@@ -138,7 +189,7 @@ function render() {
   ctx.stroke(); ctx.setLineDash([]);
   ctx.globalAlpha = .18; ctx.drawImage(target(), 0, 0); ctx.globalAlpha = 1;
   for (const s of strokes) paintStroke(ctx, s);
-  brush.classList.toggle('inked', inked);
+  updateInkUI();
   $('undo').disabled = !strokes.length || !!active;
   $('clear').disabled = !strokes.length || !!active;
   $('next').disabled = !strokes.length || !!active || !inked;
@@ -154,7 +205,7 @@ function render() {
 async function loadQuestion() {
   const token = ++loadToken;
   loading = true; cancelAnimationFrame(timerId); audio.pause();
-  started = ended = 0; active = null; inked = refilled = false; index = 0; strokes = []; saved = []; shareFile = null;
+  started = ended = 0; active = null; inked = refilled = false; index = 0; strokes = []; saved = []; shareFile = null; usedBefore = 0;
   $('timer').textContent = '00:00.00';
   $('ink').disabled = $('audio').disabled = $('drawQuestion').disabled = $('dialect').disabled = true;
   $('status').textContent = '正在載入題目與字型…';
@@ -197,6 +248,7 @@ $('ink').onclick = () => {
   if (!started) { started = performance.now(); $('drawQuestion').disabled = true; $('dialect').disabled = true; tick(); }
   else refilled = true;
   $('ink').disabled = true;
+  usedBefore = 0;
   dipBrush();
   $('inkLabel').textContent = '墨已備好';
   $('paperHint').textContent = '按住描寫，放開收筆';
@@ -255,7 +307,7 @@ function point(e) {
   return {
     x: Math.max(0, Math.min(512, (e.clientX - r.left) * 512 / r.width)),
     y: Math.max(0, Math.min(512, (e.clientY - r.top) * 512 / r.height)),
-    t: e.timeStamp, w: 6
+    t: e.timeStamp, w: 6, k: inkLevel()
   };
 }
 paper.onpointerdown = e => {
@@ -294,10 +346,12 @@ $('next').onclick = () => {
   if (evaluation.coverage < .12) { $('status').textContent = '底字還有很多地方沒描到，先補上主要筆畫，再往下一字。'; return; }
   saved.push({ canvas: inkCanvas(), ...evaluation });
   if (index === 4) { ended = performance.now(); cancelAnimationFrame(timerId); $('timer').textContent = time(ended - started); finish(); return; }
+  usedBefore += pathLen(strokes);
   index++; strokes = [];
   if (index === 3 && !refilled) {
     inked = false; $('ink').disabled = false;
     $('inkLabel').textContent = '再沾一次墨';
+    $('inkInfo').textContent = '點墨硯補墨，再寫後兩字';
     $('paperHint').textContent = '前三字完成，點墨硯補墨';
     $('status').textContent = '補一次墨，再完成後兩字；計時持續中。';
   } else $('status').textContent = `正在描第 ${index + 1} 個字。`;
