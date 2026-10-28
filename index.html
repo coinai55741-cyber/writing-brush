@@ -1,12 +1,122 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>阿黑・墨字小試</title><link rel="stylesheet" href="style.css"></head>
-<body><header><span>阿黑的客字繪卷</span><span>毛筆描寫・獨立試玩</span></header><main>
-<section id="practice"><div class="heading"><div><p class="eyebrow">聽一句客語，留下一幅字</p><h1>墨字小試</h1><p>慢寫稍粗，快寫稍細。描完第三字，記得再沾一次墨。</p></div><div class="timer"><small>描寫時間</small><strong id="timer">00:00.00</strong></div></div>
-<div class="settings"><label>腔調 <select id="dialect"><option value="1">四縣腔</option><option value="2">海陸腔</option><option value="3">大埔腔</option><option value="4">饒平腔</option><option value="5">詔安腔</option><option value="6">南四縣腔</option></select></label><button id="drawQuestion">換一句</button><button id="audio">▶ 聽客語</button></div>
-<div class="sentence"><h2 id="sentence">正在準備五字題…</h2><p id="meaning"></p><small id="source"></small></div>
-<div id="steps" class="steps" aria-label="五字描寫進度"></div>
-<div class="desk"><div class="paper"><canvas id="paper" width="512" height="512" aria-label="毛筆描寫區，按住滑鼠或用手指拖曳描字"></canvas><span id="paperHint">先點墨硯，再開始下筆</span></div><aside><button id="ink" class="inkstone" disabled><span>墨</span><b>沾墨開始</b></button><p id="inkInfo">五字共補墨一次</p><button id="undo" disabled>撤回一筆</button><button id="clear" disabled>重寫這個字</button><button id="next" class="primary" disabled>寫好，下一字 →</button></aside></div>
-<p id="status" role="status">準備題目中…</p><p class="note">試作評分只比較描寫覆蓋與偏離，不辨識筆順。所有成績僅供試玩，未送入排行榜。</p></section>
-<section id="result" hidden><p class="eyebrow">一筆一畫，寫下今天學會的客語</p><h1>你的客字繪卷</h1><p id="feedback"></p><div class="metrics"><div>描寫得分<strong id="score"></strong></div><div>描寫時間<strong id="elapsed"></strong></div><div>作品紀念章<strong>墨字初成</strong></div></div><div id="artwork" class="artwork"></div><h2 id="resultSentence"></h2><p id="resultMeaning"></p><div class="rank"><h3>排行榜・串接預覽</h3><p>正式版接入「競賽總分 → 總時間」排名。這次只記錄描寫成績。</p><div class="rankrow"><span>名次</span><span>作品</span><span>描寫分數</span><span>描寫時間</span></div><div class="rankrow"><span>未排名</span><span>本次試寫</span><span id="rankScore"></span><span id="rankTime"></span></div></div>
-<div class="share"><div><p class="eyebrow">把你的作品帶走</p><h2>我用毛筆學客語</h2><p>作品為主角，成績與評價一起留在圖卡上。</p><label>課程／單元／位置標籤<input id="sourceLabel" maxlength="70" placeholder="例如：第 3 課／生活用語／第 2 題"></label><label>邀請遊玩的網址（選填）<input id="shareUrl" type="url" placeholder="https://…"></label><p class="note">填寫實際來源即可，不必加入學生姓名或帳號。</p><div class="buttons"><button id="download" class="primary">下載作品圖</button><button id="nativeShare">分享圖片</button><button id="copy">複製文案</button><button data-platform="line">LINE</button><button data-platform="threads">Threads</button><button data-platform="facebook">Facebook</button><button data-platform="instagram">Instagram</button></div><textarea id="caption" rows="6" readonly aria-label="分享文案"></textarea><p id="shareStatus" role="status"></p><p class="note">作品紀念章由完成描寫取得。分享獎勵尚未啟用，開啟分享不代表已發文。</p></div><canvas id="card" width="1080" height="1350" aria-label="毛筆作品分享圖卡"></canvas></div><button id="restart">再描一次</button></section>
-</main><script src="app.js"></script></body></html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#355b4d">
+<title>阿黑・墨字小試</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <span class="brand"><b>墨</b>阿黑的客字繪卷</span>
+  <span class="topbar-sub">毛筆描寫・獨立試玩</span>
+</header>
+
+<main>
+  <section id="practice">
+    <div class="heading">
+      <div>
+        <p class="eyebrow">聽一句客語，留下一幅字</p>
+        <h1>墨字小試</h1>
+        <p class="lead">慢寫稍粗，快寫稍細。描完第三字，記得再沾一次墨。</p>
+      </div>
+      <div class="timer"><small>描寫時間</small><strong id="timer">00:00.00</strong></div>
+    </div>
+
+    <div class="toolbar">
+      <label class="field-inline">腔調
+        <select id="dialect">
+          <option value="1">四縣腔</option><option value="2">海陸腔</option><option value="3">大埔腔</option>
+          <option value="4">饒平腔</option><option value="5">詔安腔</option><option value="6">南四縣腔</option>
+        </select>
+      </label>
+      <button id="drawQuestion" type="button">換一句</button>
+      <button id="audio" type="button">▶ 聽客語</button>
+    </div>
+
+    <div class="sentence-card">
+      <h2 id="sentence">正在準備五字題…</h2>
+      <p id="meaning" class="meaning"></p>
+      <small id="source"></small>
+      <div id="steps" class="steps" aria-label="五字描寫進度"></div>
+    </div>
+
+    <div class="desk">
+      <div class="paper">
+        <canvas id="paper" width="512" height="512" aria-label="毛筆描寫區，按住滑鼠或用手指拖曳描字"></canvas>
+        <span id="paperHint">先點墨硯，再開始下筆</span>
+      </div>
+      <aside class="tools">
+        <button id="ink" class="inkstone" type="button" disabled><span>墨</span><b>沾墨開始</b></button>
+        <p id="inkInfo">五字共補墨一次</p>
+        <button id="undo" type="button" disabled>撤回一筆</button>
+        <button id="clear" type="button" disabled>重寫這個字</button>
+        <button id="next" type="button" class="primary" disabled>寫好，下一字 →</button>
+      </aside>
+    </div>
+
+    <p id="status" role="status">準備題目中…</p>
+    <p class="note">試作評分只比較描寫覆蓋與偏離，不辨識筆順。所有成績僅供試玩，未送入排行榜。</p>
+  </section>
+
+  <section id="result" hidden>
+    <div class="result-hero">
+      <p class="eyebrow">一筆一畫，寫下今天學會的客語</p>
+      <h1>你的客字繪卷</h1>
+      <p id="feedback" class="lead"></p>
+    </div>
+
+    <div class="metrics">
+      <div><small>描寫得分</small><strong id="score"></strong></div>
+      <div><small>描寫時間</small><strong id="elapsed"></strong></div>
+      <div><small>作品紀念章</small><strong>墨字初成</strong></div>
+    </div>
+
+    <div class="scroll-card">
+      <div id="artwork" class="artwork"></div>
+      <h2 id="resultSentence"></h2>
+      <p id="resultMeaning" class="meaning"></p>
+    </div>
+
+    <div class="share">
+      <div class="share-preview">
+        <canvas id="card" width="1080" height="1350" aria-label="毛筆作品分享圖卡預覽"></canvas>
+      </div>
+
+      <div class="share-panel">
+        <p class="eyebrow">把你的作品帶走</p>
+        <h2>我用毛筆學客語</h2>
+        <p class="lead">作品為主角，成績與評價一起留在圖卡上。</p>
+
+        <label class="field">邀請遊玩的網址（選填）
+          <input id="shareUrl" type="url" inputmode="url" placeholder="https://…">
+        </label>
+
+        <div class="actions">
+          <button id="download" type="button" class="primary">↓ 下載作品圖</button>
+          <button id="nativeShare" type="button">↗ 分享圖片</button>
+          <button id="copy" type="button">複製文案</button>
+        </div>
+
+        <div class="social">
+          <p>分享到</p>
+          <div class="social-actions">
+            <button type="button" class="social-button line" data-platform="line"><span class="social-icon"><img src="asset/social-icons/line.svg" alt="" aria-hidden="true"></span>LINE</button>
+            <button type="button" class="social-button threads" data-platform="threads"><span class="social-icon"><img src="asset/social-icons/threads.svg" alt="" aria-hidden="true"></span>Threads</button>
+            <button type="button" class="social-button facebook" data-platform="facebook"><span class="social-icon"><img src="asset/social-icons/facebook.svg" alt="" aria-hidden="true"></span>Facebook</button>
+            <button type="button" class="social-button instagram" data-platform="instagram"><span class="social-icon"><img src="asset/social-icons/instagram.svg" alt="" aria-hidden="true"></span>Instagram</button>
+          </div>
+        </div>
+
+        <p id="shareStatus" role="status"></p>
+        <p class="note">作品紀念章由完成描寫取得。分享獎勵尚未啟用，開啟分享不代表已發文。</p>
+      </div>
+    </div>
+
+    <div class="restart-row"><button id="restart" type="button">再描一次</button></div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
