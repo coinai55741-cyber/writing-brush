@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#355b4d">
 <title>阿黑・墨字小試</title>
-<link rel="stylesheet" href="style.css?v=20261028-ink">
+<link rel="stylesheet" href="style.css?v=20261028-yuji">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -101,14 +101,14 @@
     <div class="metrics">
       <div><small>描寫得分</small><strong id="score"></strong></div>
       <div><small>描寫時間</small><strong id="elapsed"></strong></div>
-      <div><small>作品紀念章</small><strong id="stampName"></strong><em id="stampLine"></em></div>
+      <div class="stamp-tile"><small>作品紀念章</small><strong id="stampName"></strong><em id="stampLine"></em></div>
     </div>
 
     <div class="scroll-card">
       <div id="artwork" class="artwork"></div>
       <h2 id="resultSentence"></h2>
       <p id="resultMeaning" class="meaning"></p>
-      <canvas id="stamp" class="stamp" width="240" height="240" aria-label="作品紀念章"></canvas>
+      <div class="stamp-wrap"><canvas id="stamp" class="stamp" width="240" height="240" aria-label="作品紀念章"></canvas><i class="stamp-ring" aria-hidden="true"></i></div>
     </div>
 
     <div class="share">
@@ -145,6 +145,6 @@
     <div class="restart-row"><button id="restart" type="button">再描一次</button></div>
   </section>
 </main>
-<script src="app.js?v=20261028-ink"></script>
+<script src="app.js?v=20261028-yuji"></script>
 </body>
 </html>

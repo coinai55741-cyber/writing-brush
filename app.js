@@ -79,8 +79,10 @@ function drawStamp(g, cx, cy, size, st) {
   /* 章名：由左至右、由上而下，兩字一行（沿用現代讀法，方便閱讀） */
   const fs = round ? 54 : st.style === 'gold' ? 62 : 70, dx = round ? 30 : st.style === 'gold' ? 36 : 38, dy = dx;
   const pos = [[120 - dx, 120 - dy], [120 + dx, 120 - dy], [120 - dx, 120 + dy], [120 + dx, 120 + dy]];
-  k.font = `900 ${fs}px Hakka, "Microsoft JhengHei", sans-serif`; k.textAlign = 'center'; k.textBaseline = 'middle';
-  const drawChars = () => chars.forEach((ch, i) => k.fillText(ch, pos[i][0], pos[i][1] + 3));
+  k.font = `${fs}px StampBrush, Hakka, "Microsoft JhengHei", sans-serif`; k.textAlign = 'center'; k.textBaseline = 'middle';
+  /* Yuji Mai 筆畫偏細，補一圈同色描邊讓小尺寸也清楚 */
+  k.lineJoin = 'round'; k.lineWidth = fs * .02;
+  const drawChars = () => chars.forEach((ch, i) => { k.fillText(ch, pos[i][0], pos[i][1] + 3); k.strokeText(ch, pos[i][0], pos[i][1] + 3); });
   if (st.style === 'gold') { k.fillStyle = '#f6dc90'; drawChars(); } else cut(drawChars);
 
   /* 斑駁：固定亂數，讓同一個章每次一致 */
@@ -210,7 +212,7 @@ async function loadQuestion() {
   $('ink').disabled = $('audio').disabled = $('drawQuestion').disabled = $('dialect').disabled = true;
   $('status').textContent = '正在載入題目與字型…';
   try {
-    await document.fonts.load('330px Hakka');
+    await Promise.all([document.fonts.load('330px Hakka'), document.fonts.load('60px StampBrush', '墨')]);
     const lists = await Promise.all([1, 2, 3, 4, 5].map(async n => {
       const r = await fetch(`data/quiz/questions_dialect_${$('dialect').value}_level_${n}.json`);
       if (!r.ok) throw Error();
@@ -365,7 +367,6 @@ function finish() {
   feedback = pick(FEEDBACK_LINES[score >= 8 ? 'high' : coverage < .65 ? 'low' : 'mid']);
   $('practice').hidden = true; $('result').hidden = false;
   $('feedback').textContent = feedback;
-  $('score').textContent = `${score.toFixed(2)} / 10`;
   $('elapsed').textContent = time(ended - started);
   $('artwork').replaceChildren(...saved.map(s => { const c = makeCanvas(); c.getContext('2d').drawImage(s.canvas, 0, 0); return c; }));
   $('resultSentence').textContent = question.hakka_hanji;
@@ -377,7 +378,36 @@ function finish() {
   sg.clearRect(0, 0, sc.width, sc.height);
   drawStamp(sg, 120, 120, 220, stamp);
   drawCard();
+  playSettle();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* 結算動畫：分數跳動計數，接著蓋章。使用者偏好減少動態時直接顯示結果。 */
+let settleToken = 0;
+function playSettle() {
+  const token = ++settleToken;
+  const stampEl = $('stamp'), card = document.querySelector('.scroll-card'), tile = $('stampName').parentElement;
+  const finalText = `${score.toFixed(2)} / 10`;
+  stampEl.classList.remove('pre', 'stamp-in'); card.classList.remove('impact'); tile.classList.remove('hold', 'reveal');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { $('score').textContent = finalText; return; }
+  stampEl.classList.add('pre'); tile.classList.add('hold');
+  $('score').textContent = '0.00 / 10';
+  const t0 = performance.now(), DUR = 900;
+  const step = now => {
+    if (token !== settleToken) return;
+    const p = Math.min(1, (now - t0) / DUR), eased = 1 - Math.pow(1 - p, 3);
+    $('score').textContent = p < 1 ? `${(score * eased).toFixed(2)} / 10` : finalText;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  setTimeout(() => { if (token === settleToken) $('score').textContent = finalText; }, DUR + 150);   // 背景分頁會暫停動畫，保證最後顯示正確分數
+  setTimeout(() => {
+    if (token !== settleToken) return;
+    void stampEl.offsetWidth;
+    stampEl.classList.remove('pre'); stampEl.classList.add('stamp-in');
+    card.classList.add('impact');
+    tile.classList.remove('hold'); tile.classList.add('reveal');
+  }, 1000);
 }
 
 /* ==========================================================================
@@ -401,7 +431,7 @@ async function drawCard() {
   if (!saved.length) return;
   const version = ++cardVersion;
   shareFile = null;
-  await document.fonts.load('30px Hakka');
+  await Promise.all([document.fonts.load('30px Hakka'), document.fonts.load('60px StampBrush', '墨')]);
   if (version !== cardVersion) return;
   const c = $('card'), g = c.getContext('2d');
   c.width = 1080; c.height = 1350;

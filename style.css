@@ -4,6 +4,13 @@
   font-display: swap;
 }
 
+/* 紀念章章名：Yuji Mai（SIL OFL 1.1），只含章名用到的 16 個字；授權見 fonts/OFL-YujiMai.txt */
+@font-face {
+  font-family: StampBrush;
+  src: url('fonts/YujiMai-stamp.woff2') format('woff2');
+  font-display: block;
+}
+
 :root {
   --ink: #393b30;
   --muted: #746e60;
@@ -227,7 +234,30 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 .artwork canvas { width: 20%; max-width: 180px; height: auto; }
 .scroll-card h2 { margin-top: 18px; padding: 0 16px; letter-spacing: 4px; }
 .scroll-card .meaning { padding: 0 16px; }
-.stamp { position: absolute; right: 26px; bottom: 16px; width: 104px; height: 104px; pointer-events: none; }
+.stamp-wrap { position: absolute; right: 26px; bottom: 16px; width: 104px; height: 104px; pointer-events: none; }
+.stamp { display: block; width: 100%; height: 100%; transform-origin: 50% 50%; }
+.stamp-ring { position: absolute; inset: 0; border: 3px solid rgba(194, 59, 42, .6); border-radius: 50%; opacity: 0; }
+
+/* 結算動畫：分數跳動 → 章從上方重重蓋下 → 卡片微震、漣漪擴散 → 章名浮現 */
+.stamp.pre { opacity: 0; }
+.stamp.stamp-in { animation: stampSlam .55s cubic-bezier(.2, .7, .2, 1) both; }
+.scroll-card.impact { animation: cardThud .32s .25s ease-out; }
+.scroll-card.impact .stamp-ring { animation: stampRing .65s .25s ease-out both; }
+.stamp-tile.hold strong, .stamp-tile.hold em { opacity: 0; }
+.stamp-tile.reveal strong, .stamp-tile.reveal em { animation: fadeUp .45s .3s ease-out both; }
+@keyframes stampSlam {
+  0%   { opacity: 0; transform: scale(2.7) rotate(-16deg); filter: blur(3px); }
+  45%  { opacity: 1; transform: scale(.92) rotate(2deg); filter: blur(0); }
+  62%  { transform: scale(1.07) rotate(-1deg); }
+  80%  { transform: scale(.98); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes cardThud { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(3px); } 62% { transform: translateY(-1px); } }
+@keyframes stampRing { 0% { opacity: .8; transform: scale(.7); } 100% { opacity: 0; transform: scale(2.4); } }
+@keyframes fadeUp { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .stamp.stamp-in, .scroll-card.impact, .scroll-card.impact .stamp-ring, .stamp-tile.reveal strong, .stamp-tile.reveal em { animation: none; }
+}
 .metrics em { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-style: normal; }
 
 /* ---------- 分享區 ---------- */
@@ -302,6 +332,6 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
   .metrics > div { padding: 12px; }
   .metrics strong { font-size: 18px; }
   .artwork { padding: 12px 6px; }
-  .stamp { position: static; display: block; width: 92px; height: 92px; margin: 10px auto 0; }
+  .stamp-wrap { position: relative; right: auto; bottom: auto; width: 92px; height: 92px; margin: 10px auto 0; }
   .share-panel { padding: 18px; }
 }
