@@ -227,12 +227,13 @@ async function loadQuestion() {
     $('sentence').textContent = question.hakka_hanji;
     $('meaning').textContent = question.chinese_sentence || '';
     $('source').textContent = `${names[$('dialect').value]} · 第 ${question.level} 級 · ${question.category}`;
-    $('status').textContent = `本腔調有 ${pool.length} 道五字題。先聽音檔，再點墨硯開始計時。`;
+    $('status').textContent = '';
     $('paperHint').textContent = '先點墨硯，再開始下筆';
     $('inkLabel').textContent = '沾墨開始';
     $('inkInfo').textContent = '第三字完成後補墨一次';
     $('ink').disabled = false; $('audio').disabled = false;
     render();
+    autoplay();
   } catch {
     $('status').textContent = '題庫或字型載入失敗，請透過本機伺服器開啟，再按「換一句」重試。';
   } finally {
@@ -544,6 +545,16 @@ $('audio').onclick = () => {
   audio.currentTime = 0;
   audio.play().catch(() => { $('status').textContent = '音檔暫時無法播放，請確認網路後再試。'; });
 };
+
+// 進入題目自動播音；瀏覽器擋住自動播放（頁面剛開、尚無互動）時，改為第一次點擊或觸碰時補播。
+function autoplay() {
+  audio.currentTime = 0;
+  audio.play().catch(() => {
+    const src = audio.src;
+    const retry = () => { if (audio.src === src && audio.paused && !started) audio.play().catch(() => {}); };
+    document.addEventListener('pointerdown', retry, { once: true });
+  });
+}
 $('drawQuestion').onclick = loadQuestion;
 $('dialect').onchange = loadQuestion;
 $('restart').onclick = () => { $('result').hidden = true; $('practice').hidden = false; loadQuestion(); window.scrollTo(0, 0); };
