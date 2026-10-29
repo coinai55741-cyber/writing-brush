@@ -138,6 +138,7 @@ function target() {
    ========================================================================== */
 const INK_SPAN = 4800;      // 畫布單位：一次沾墨可寫的總長度
 const INK_FLOOR = .03;      // 顯示用墨量下限：墨快用完時筆跡越來越細、飛白越多，但仍看得到
+const REFILL_AT = .35;      // 墨量低於這個值（筆跡約呈灰褐色）就出現紅字提示，可提前點墨硯補墨
 const DRY_START = .5;       // 墨量低於這個值開始出現飛白
 let usedBefore = 0;         // 本次沾墨後，已定稿的字用掉的長度
 const pathLen = list => list.reduce((sum, st) => sum + st.reduce((l, p, i) => i ? l + Math.hypot(p.x - st[i - 1].x, p.y - st[i - 1].y) : l, 0), 0);
@@ -200,7 +201,7 @@ function updateInkUI() {
   brush.classList.toggle('inked', inked);
   brush.style.setProperty('--ink', inked ? (.35 + .65 * lvl).toFixed(2) : 0);
   $('inkBar').style.width = (lvl * 100).toFixed(0) + '%';
-  const dry = inked && lvl < .3, out = !inked && !!started && !ended;
+  const dry = inked && lvl < REFILL_AT, out = !inked && !!started && !ended;
   if (dry && !loading) $('ink').disabled = active !== null;   // 墨快乾（出現紅字）時就可以提前補墨，不必等用完
   else if (inked) $('ink').disabled = true;
   $('ink').classList.toggle('needs-ink', (dry || out) && !$('ink').disabled);
@@ -284,7 +285,7 @@ function tick() {
 }
 
 $('ink').onclick = () => {
-  if (loading || active !== null || (inked && inkLevel() >= .3)) return;
+  if (loading || active !== null || (inked && inkLevel() >= REFILL_AT)) return;
   inked = true;
   if (!started) { started = performance.now(); $('drawQuestion').disabled = true; $('dialect').disabled = true; tick(); }
   else refilled = true;
