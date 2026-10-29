@@ -1,11 +1,17 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const names = ['', '四縣腔', '海陸腔', '大埔腔', '饒平腔', '詔安腔', '南四縣腔'];
+const query = new URLSearchParams(window.location.search);
+const embedded = query.get('embedded') === '1';
+const hostDialect = query.get('dialect');
+let hostSummary = null;
 const paper = $('paper'), ctx = paper.getContext('2d');
 const makeCanvas = () => { const c = document.createElement('canvas'); c.width = c.height = 512; return c; };
 let question, chars = [], index = 0, strokes = [], saved = [], started = 0, ended = 0, active = null;
 let inked = false, refilled = false, loading = false, loadToken = 0, shareFile = null;
 let score = 0, feedback = '', timerId = 0, stamp = null;
+if (embedded) document.body.classList.add('embedded');
+if (hostDialect && $('dialect').querySelector(`option[value="${CSS.escape(hostDialect)}"]`)) $('dialect').value = hostDialect;
 const audio = new Audio();
 const clean = s => Array.from(s.replace(/[\p{P}\p{Z}\s]/gu, ''));
 const time = ms => {
@@ -108,8 +114,18 @@ function drawStamp(g, cx, cy, size, st) {
    ========================================================================== */
 /* 筆畫資料（strokes/strokes.json，由 tools/build_strokes.py 產生）：每字的筆畫輪廓與中心線，座標為 1024 字格。
    底字範本用這份輪廓畫出，筆順也用同一份中心線比對；查不到的字退回字型底字、不算筆順。 */
+// Opened from disk (file://) fetch() is blocked and the page origin is opaque: fall back to <script> copies
+// of the data (strokes/strokes.js, data/quiz/questions_offline.js) and postMessage to '*'.
+const hostOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
+const loadScript = src => new Promise(resolve => {
+  const s = document.createElement('script');
+  s.src = src; s.onload = () => resolve(true); s.onerror = () => resolve(false);
+  document.head.appendChild(s);
+});
 let STROKE_DATA = null;
-const strokesReady = fetch('strokes/strokes.json').then(r => r.json()).then(d => { STROKE_DATA = d; }).catch(() => { STROKE_DATA = null; });
+const strokesReady = fetch('strokes/strokes.json').then(r => r.json())
+  .catch(async () => (await loadScript('strokes/strokes.js')) ? window.STROKE_DATA_FILE : null)
+  .then(d => { STROKE_DATA = d || null; }, () => { STROKE_DATA = null; });
 const GS = .38, GO = (512 - 1024 * GS) / 2;                 // 1024 字格縮放到畫布的比例與左上角位置
 const toCanvas = ([x, y]) => ({ x: GO + GS * x, y: GO + GS * (900 - y) });   // 資料座標 y 軸朝上，字格上緣在 900
 const glyphCache = new Map();
@@ -251,12 +267,21 @@ async function loadQuestion() {
   $('ink').disabled = $('audio').disabled = $('drawQuestion').disabled = $('dialect').disabled = true;
   $('status').textContent = '正在載入題目與字型…';
   try {
-    await Promise.all([document.fonts.load('330px Hakka'), document.fonts.load('60px StampBrush', '墨'), strokesReady]);
-    const lists = await Promise.all([1, 2, 3, 4, 5].map(async n => {
-      const r = await fetch(`data/quiz/questions_dialect_${$('dialect').value}_level_${n}.json`);
-      if (!r.ok) throw Error();
-      return r.json();
-    }));
+    // A missing font only changes how the fallback glyph and stamp look; it must not block the question.
+    await Promise.all([document.fonts.load('330px Hakka').catch(() => {}), document.fonts.load('60px StampBrush', '墨').catch(() => {}), strokesReady]);
+    let lists;
+    try {
+      lists = await Promise.all([1, 2, 3, 4, 5].map(async n => {
+        const r = await fetch(`data/quiz/questions_dialect_${$('dialect').value}_level_${n}.json`);
+        if (!r.ok) throw Error();
+        return r.json();
+      }));
+    } catch {
+      if (!window.QUIZ_OFFLINE) await loadScript('data/quiz/questions_offline.js');
+      const offline = window.QUIZ_OFFLINE && window.QUIZ_OFFLINE[$('dialect').value];
+      if (!offline) throw Error();
+      lists = [offline];
+    }
     if (token !== loadToken) return;
     const pool = lists.flat().filter(q => q.hakka_char_count === 5 && clean(q.hakka_hanji).length === 5);
     if (!pool.length) throw Error();
@@ -276,7 +301,7 @@ async function loadQuestion() {
   } catch {
     $('status').textContent = '題庫或字型載入失敗，請透過本機伺服器開啟，再按「換一句」重試。';
   } finally {
-    loading = false; $('drawQuestion').disabled = false; $('dialect').disabled = false;
+    loading = false; $('drawQuestion').disabled = false; $('dialect').disabled = embedded;
   }
 }
 
@@ -476,6 +501,17 @@ function finish() {
   drawStamp(sg, 120, 120, 220, stamp);
   drawCard();
   playSettle();
+  if (embedded && window.parent !== window) {
+    const orderValues = saved.filter(v => v.order).map(v => v.order.order);
+    window.parent.postMessage({
+      type: 'brush-complete',
+      score: Number(score.toFixed(2)),
+      writingElapsedMs: Math.max(0, ended - started),
+      orderRate: orderValues.length ? Number((orderValues.reduce((x, y) => x + y, 0) / orderValues.length).toFixed(4)) : null,
+      stampName: stamp.name,
+      question: { hakka_hanji: question.hakka_hanji, chinese_sentence: question.chinese_sentence || '', dialect: $('dialect').value }
+    }, hostOrigin);
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -514,6 +550,7 @@ function caption() {
   return [
     '我用毛筆學客語！',
     `【${names[$('dialect').value]}】${question.hakka_hanji}`,
+    hostSummary ? `本關總分：${Number(hostSummary.totalScore).toFixed(2)} / 100` : '',
     question.chinese_sentence || '',
     `書寫 ${score.toFixed(2)} / 10 分 · ${time(ended - started)}`,
     feedback
@@ -528,13 +565,14 @@ let cardVersion = 0;
 const SCROLL = { w: 1400, h: 371, px: 76, py: 40, pw: 1254, ph: 277 };
 const scrollImg = new Image();
 scrollImg.src = 'asset/scroll.webp';
-const scrollReady = scrollImg.decode().then(() => true, () => false);
+// From disk the scroll image would taint the canvas and break toBlob, so the card falls back to the plain frame.
+const scrollReady = window.location.protocol === 'file:' ? Promise.resolve(false) : scrollImg.decode().then(() => true, () => false);
 
 async function drawCard() {
   if (!saved.length) return;
   const version = ++cardVersion;
   shareFile = null;
-  const [, , scrollOk] = await Promise.all([document.fonts.load('30px Hakka'), document.fonts.load('60px StampBrush', '墨'), scrollReady]);
+  const [, , scrollOk] = await Promise.all([document.fonts.load('30px Hakka').catch(() => {}), document.fonts.load('60px StampBrush', '墨').catch(() => {}), scrollReady]);
   if (version !== cardVersion) return;
   const c = $('card'), g = c.getContext('2d');
   c.width = 1080; c.height = 1350;
@@ -583,7 +621,9 @@ async function drawCard() {
 
   g.fillStyle = '#355b4d'; g.font = '40px Hakka'; g.fillText('你也來玩玩看吧！', 540, 1255);
   g.fillStyle = '#78664a'; g.font = '20px Hakka';
-  g.fillText('獨立試寫成果・非正式競賽成績', 540, 1288, 900);
+  g.fillText(hostSummary
+    ? `本關總分 ${Number(hostSummary.totalScore).toFixed(2)} / 100・總時間 ${hostSummary.totalElapsedText}`
+    : '獨立試寫成果・非正式競賽成績', 540, 1288, 900);
 
   c.toBlob(blob => {
     if (blob && version === cardVersion) shareFile = new File([blob], '阿黑毛筆作品.png', { type: 'image/png' });
@@ -669,4 +709,13 @@ function autoplay() {
 $('drawQuestion').onclick = loadQuestion;
 $('dialect').onchange = loadQuestion;
 $('restart').onclick = () => { $('result').hidden = true; $('practice').hidden = false; loadQuestion(); window.scrollTo(0, 0); };
+window.addEventListener('message', event => {
+  if (!embedded || event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== 'brush-session-summary') return;
+  hostSummary = event.data;
+  drawCard();
+});
+document.addEventListener('keydown', event => {
+  if (!embedded || event.key !== 'Escape' || $('result').hidden) return;
+  window.parent.postMessage({ type: 'brush-close-request' }, hostOrigin);
+});
 loadQuestion();
