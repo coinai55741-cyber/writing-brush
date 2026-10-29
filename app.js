@@ -21,21 +21,23 @@ const time = ms => {
 const FEEDBACK_LINES = {
   high: ['筆畫完整，落筆也很穩！'],
   mid: ['字形已經出來了！下次試著讓筆跡更貼近底字。'],
-  low: ['五個字完成了！下次把漏掉的筆畫再補齊。']
+  low: ['五個字完成了！下次把漏掉的筆畫再補齊。'],
+  scribble: ['筆畫有點亂喔！下次放慢速度，沿著底字一筆一畫描。']
 };
 const pick = list => list[Math.floor(Math.random() * list.length)];
 
 /* ==========================================================================
-   作品紀念章：依描寫得分分五階段，各有不同章名與印章造型。
+   作品紀念章：依描寫得分分六階段（含 2 分以下的亂寫章），各有不同章名與印章造型。
    門檻為暫定值（計分尚未用真實學生作品校準），之後只需要改這張表。
-   style：circle 單線圓章／square 方章／double 雙線方章／cloud 雲紋邊方章／gold 金邊雙框章
+   style：circle 單線圓章／splash 墨花不規則圓章／square 方章／double 雙線方章／cloud 雲紋邊方章／gold 金邊雙框章
    ========================================================================== */
 const STAMPS = [
   { min: 9,   name: '墨韻客家', line: '字裡有客家的味道',   style: 'gold' },
   { min: 7.5, name: '落筆生輝', line: '每一筆都有精神',     style: 'cloud' },
   { min: 6,   name: '運筆漸穩', line: '筆畫愈來愈穩',       style: 'double' },
   { min: 4,   name: '墨字初成', line: '字形出來了',         style: 'square' },
-  { min: 0,   name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' }
+  { min: 2,   name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' },
+  { min: 0,   name: '墨花亂舞', line: '筆下好熱鬧，下次慢慢描', style: 'splash' }   // 2 分以下，多半是亂寫
 ];
 const stampFor = value => STAMPS.find(st => value >= st.min);
 
@@ -47,10 +49,16 @@ function drawStamp(g, cx, cy, size, st) {
   const rr = (x, y, w, h, r) => { k.beginPath(); k.roundRect(x, y, w, h, r); };
   const cut = fn => { k.save(); k.globalCompositeOperation = 'destination-out'; fn(); k.restore(); };
   const chars = Array.from(st.name);
-  const round = st.style === 'circle';
+  const round = st.style === 'circle' || st.style === 'splash';
   k.fillStyle = k.strokeStyle = RED;
 
-  if (round) {
+  if (st.style === 'splash') {
+    /* 墨花：邊緣像墨水濺開的不規則圓，四周再濺幾點墨 */
+    const edge = (rad, wob) => { k.beginPath(); for (let a = 0; a <= 360; a += 3) { const t = a * Math.PI / 180, r = rad + wob * (Math.sin(5 * t) * .6 + Math.sin(9 * t + 1) * .4); k[a ? 'lineTo' : 'moveTo'](120 + r * Math.cos(t), 120 + r * Math.sin(t)); } k.closePath(); };
+    edge(92, 7); k.fill();
+    cut(() => { k.lineWidth = 3; edge(80, 4); k.stroke(); });
+    for (const [x, y, r] of [[214, 66, 5], [28, 172, 4], [200, 206, 3.5], [48, 38, 3]]) { k.beginPath(); k.arc(x, y, r, 0, Math.PI * 2); k.fill(); }
+  } else if (round) {
     k.beginPath(); k.arc(120, 120, 96, 0, Math.PI * 2); k.fill();
     cut(() => { k.lineWidth = 3; k.beginPath(); k.arc(120, 120, 86, 0, Math.PI * 2); k.stroke(); });
   } else if (st.style === 'square') {
@@ -106,16 +114,17 @@ function target() {
 }
 
 /* ==========================================================================
-   墨量：沾墨後為 1，依筆畫走過的距離遞減（約夠寫三個字），再沾墨歸 1。
+   墨量：沾墨後為 1，依筆畫走過的距離遞減（約夠寫三個字），用完（<= 0）必須再沾墨，次數不限，再沾墨歸 1。
    只影響畫面：墨少時墨色變灰、線條變細，並出現飛白（筆毛沒蓋到的細絲）。
    計分用固定線寬另外重畫（fixed），不受墨量影響。
    ========================================================================== */
 const INK_SPAN = 4800;      // 畫布單位：一次沾墨可寫的總長度
-const INK_FLOOR = .1;       // 墨量下限：再乾也看得到筆跡
+const INK_FLOOR = .03;      // 顯示用墨量下限：墨快用完時筆跡越來越細、飛白越多，但仍看得到
 const DRY_START = .5;       // 墨量低於這個值開始出現飛白
 let usedBefore = 0;         // 本次沾墨後，已定稿的字用掉的長度
 const pathLen = list => list.reduce((sum, st) => sum + st.reduce((l, p, i) => i ? l + Math.hypot(p.x - st[i - 1].x, p.y - st[i - 1].y) : l, 0), 0);
-const inkLevel = () => Math.max(INK_FLOOR, 1 - (usedBefore + pathLen(strokes)) / INK_SPAN);
+const inkLeft = () => 1 - (usedBefore + pathLen(strokes)) / INK_SPAN;   // 實際剩餘墨量，<= 0 即用完
+const inkLevel = () => Math.max(INK_FLOOR, Math.min(1, inkLeft()));
 const inkColor = k => {
   const t = Math.max(0, Math.min(1, k)), mix = (x, y) => Math.round(x + (y - x) * t);
   return `rgb(${mix(140, 36)},${mix(133, 34)},${mix(120, 29)})`;
@@ -140,7 +149,7 @@ function paintStroke(g, s, fixed = false) {
   }
   const seed = s[0].x * .37 + s[0].y * .73, N = 7;
   for (let i = 1; i < s.length; i++) {
-    const a = s[i - 1], b = s[i], k = b.k ?? 1, W = b.w * (.78 + .22 * k);
+    const a = s[i - 1], b = s[i], k = b.k ?? 1, W = b.w * (.4 + .6 * k);
     g.strokeStyle = g.fillStyle = inkColor(k);
     if (k >= DRY_START) {
       g.lineWidth = W;
@@ -174,11 +183,20 @@ function updateInkUI() {
   brush.style.setProperty('--ink', inked ? (.35 + .65 * lvl).toFixed(2) : 0);
   $('inkBar').style.width = (lvl * 100).toFixed(0) + '%';
   $('ink').classList.toggle('needs-ink', !inked && !!started && !ended && !$('ink').disabled);
-  const dry = inked && lvl < .3;
-  $('inkInfo').classList.toggle('dry', dry);
+  const dry = inked && lvl < .3, out = !inked && !!started && !ended;
+  $('inkInfo').classList.toggle('dry', dry || out);
   if (inked) $('inkInfo').textContent = dry
-    ? (refilled ? '墨快乾了，加油寫完！' : '墨快乾了，寫完第三字再沾墨')
-    : (refilled ? '墨已補滿' : '第三字完成後補墨一次');
+    ? '墨快乾了，用完記得點墨硯補墨'
+    : (refilled ? '墨已補滿，用完可再補' : '墨用完再補，次數不限');
+  else if (out) $('inkInfo').textContent = '墨用完了，記得點墨硯補墨';
+}
+
+/* 墨用完：停筆，等使用者點墨硯補墨（次數不限，計時持續）。 */
+function needRefill() {
+  inked = false; $('ink').disabled = false;
+  $('inkLabel').textContent = '再沾一次墨';
+  $('paperHint').textContent = '墨用完了，點墨硯補墨';
+  $('status').textContent = '墨用完了，點墨硯再沾墨；計時持續中。';
 }
 
 function render() {
@@ -194,7 +212,7 @@ function render() {
   updateInkUI();
   $('undo').disabled = !strokes.length || !!active;
   $('clear').disabled = !strokes.length || !!active;
-  $('next').disabled = !strokes.length || !!active || !inked;
+  $('next').disabled = !strokes.length || !!active;
   $('next').textContent = index === 4 ? '完成五字，查看成果' : '寫好，下一字 →';
   $('steps').replaceChildren(...chars.map((ch, i) => {
     const e = document.createElement('span');
@@ -230,7 +248,7 @@ async function loadQuestion() {
     $('status').textContent = '';
     $('paperHint').textContent = '先點墨硯，再開始下筆';
     $('inkLabel').textContent = '沾墨開始';
-    $('inkInfo').textContent = '第三字完成後補墨一次';
+    $('inkInfo').textContent = '墨用完再補，次數不限';
     $('ink').disabled = false; $('audio').disabled = false;
     render();
     autoplay();
@@ -251,11 +269,11 @@ $('ink').onclick = () => {
   if (!started) { started = performance.now(); $('drawQuestion').disabled = true; $('dialect').disabled = true; tick(); }
   else refilled = true;
   $('ink').disabled = true;
-  usedBefore = 0;
+  usedBefore = -pathLen(strokes);   // 補墨可能發生在一個字寫到一半，目前字已寫的長度不再扣墨
   dipBrush();
   $('inkLabel').textContent = '墨已備好';
   $('paperHint').textContent = '按住描寫，放開收筆';
-  $('status').textContent = refilled ? '墨已補滿，繼續完成後兩字。' : '可以下筆了。慢寫稍粗、快寫稍細。';
+  $('status').textContent = refilled ? '墨已補滿，繼續描寫。' : '可以下筆了。慢寫稍粗、快寫稍細。';
   render();
 };
 
@@ -325,10 +343,19 @@ paper.onpointermove = e => {
   p.w = a.w * .65 + Math.max(7, Math.min(23, 23 - speed * 9)) * .35;
   s.push(p); render();
 };
-function release(e) { if (active !== e.pointerId) return; active = null; render(); }
+function release(e) {
+  if (active !== e.pointerId) return;
+  active = null;
+  /* 墨在一筆中途用完時，這一筆仍可寫完（越寫越淡越細）；收筆後才要求補墨 */
+  if (inked && inkLeft() <= 0) needRefill();
+  render();
+}
 paper.onpointerup = paper.onpointercancel = paper.onlostpointercapture = release;
 $('undo').onclick = () => { strokes.pop(); render(); };
 $('clear').onclick = () => { strokes = []; render(); };
+
+const SCRIBBLE_STROKE_W = 24, SCRIBBLE_FROM = 2.5, SCRIBBLE_TO = 5;   // 亂寫偵測：路徑長度倍數 2.5 起扣分，5 倍以上扣到最重
+const LOOSE_LOW = .2, LOOSE_HIGH = .45;                               // 與底字重疊度（F1）太低時額外扣分
 
 /* 評分：描寫墨跡（固定線寬）與標準底字比較，覆蓋率與精準度取調和平均；不辨識筆順。 */
 function assess() {
@@ -340,24 +367,24 @@ function assess() {
     if (a) goal++; if (b) drawn++; if (a && b) hit++;
   }
   const coverage = goal ? hit / goal : 0, precision = drawn ? hit / drawn : 0;
-  return { coverage, precision, value: coverage + precision ? 2 * coverage * precision / (coverage + precision) : 0 };
+  const f1 = coverage + precision ? 2 * coverage * precision / (coverage + precision) : 0;
+  /* 亂寫偵測：筆畫總長相對底字所需長度（底字面積 ÷ 筆畫粗細）。正常描寫約 1～2 倍；來回塗抹、打圈會高出許多。 */
+  const ratio = goal ? pathLen(strokes) / (goal / SCRIBBLE_STROKE_W) : 0;
+  const tangle = Math.max(0, Math.min(1, (ratio - SCRIBBLE_FROM) / (SCRIBBLE_TO - SCRIBBLE_FROM)));
+  const loose = Math.max(0, Math.min(1, (f1 - LOOSE_LOW) / (LOOSE_HIGH - LOOSE_LOW)));
+  return { coverage, precision, f1, ratio, value: f1 * (1 - .8 * tangle) * (.4 + .6 * loose) };
 }
 
 $('next').onclick = () => {
-  if (active !== null || !inked || !strokes.length) return;
+  if (active !== null || !strokes.length) return;
   const evaluation = assess();
   if (evaluation.coverage < .12) { $('status').textContent = '底字還有很多地方沒描到，先補上主要筆畫，再往下一字。'; return; }
   saved.push({ canvas: inkCanvas(), ...evaluation });
   if (index === 4) { ended = performance.now(); cancelAnimationFrame(timerId); $('timer').textContent = time(ended - started); finish(); return; }
   usedBefore += pathLen(strokes);
   index++; strokes = [];
-  if (index === 3 && !refilled) {
-    inked = false; $('ink').disabled = false;
-    $('inkLabel').textContent = '再沾一次墨';
-    $('inkInfo').textContent = '點墨硯補墨，再寫後兩字';
-    $('paperHint').textContent = '前三字完成，點墨硯補墨';
-    $('status').textContent = '補一次墨，再完成後兩字；計時持續中。';
-  } else $('status').textContent = `正在描第 ${index + 1} 個字。`;
+  if (inkLeft() <= 0) needRefill();
+  else $('status').textContent = `正在描第 ${index + 1} 個字。`;
   render();
 };
 
@@ -365,7 +392,7 @@ function finish() {
   audio.pause();
   score = saved.reduce((s, v) => s + v.value, 0) / 5 * 10;
   const coverage = saved.reduce((s, v) => s + v.coverage, 0) / 5;
-  feedback = pick(FEEDBACK_LINES[score >= 8 ? 'high' : coverage < .65 ? 'low' : 'mid']);
+  feedback = pick(FEEDBACK_LINES[score >= 8 ? 'high' : score < 2 ? 'scribble' : coverage < .65 ? 'low' : 'mid']);
   $('practice').hidden = true; $('result').hidden = false;
   $('feedback').textContent = feedback;
   $('elapsed').textContent = time(ended - started);
