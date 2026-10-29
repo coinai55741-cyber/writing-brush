@@ -225,13 +225,14 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 
 .scroll-card { position: relative; padding: 0 0 30px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; text-align: center; }
 .artwork {
-  display: flex; justify-content: center;
-  padding: 22px 20px;
-  background: #fffaf0;
-  border-bottom: 5px solid #87663f;
-  border-top: 5px solid #87663f;
+  /* 繪卷底圖 1400×371，紙面在 (76,40)–(1330,317)；padding 以寬度百分比換算 */
+  display: flex; align-items: center;
+  aspect-ratio: 1400 / 371;
+  width: min(100%, 720px); margin: 0 auto;
+  padding: 2.86% 5% 3.86% 5.43%;
+  background: url(asset/scroll.webp) center / 100% 100% no-repeat;
 }
-.artwork canvas { width: 20%; max-width: 180px; height: auto; }
+.artwork canvas { flex: 1 1 0; min-width: 0; width: 0; height: auto; aspect-ratio: 1; transform: scale(1.15); }   /* 字稿四周有留白，放大一點字才夠大 */
 .scroll-card h2 { margin-top: 18px; padding: 0 16px; letter-spacing: 4px; }
 .scroll-card .meaning { padding: 0 16px; }
 .stamp-wrap { position: absolute; right: 26px; bottom: 16px; width: 104px; height: 104px; pointer-events: none; }
@@ -331,7 +332,6 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
   .metrics { gap: 8px; grid-template-columns: repeat(2, 1fr); }
   .metrics > div { padding: 12px; }
   .metrics strong { font-size: 18px; }
-  .artwork { padding: 12px 6px; }
   .stamp-wrap { position: relative; right: auto; bottom: auto; width: 92px; height: 92px; margin: 10px auto 0; }
   .share-panel { padding: 18px; }
 }

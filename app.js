@@ -138,7 +138,7 @@ function target() {
    ========================================================================== */
 const INK_SPAN = 4800;      // 畫布單位：一次沾墨可寫的總長度
 const INK_FLOOR = .03;      // 顯示用墨量下限：墨快用完時筆跡越來越細、飛白越多，但仍看得到
-const REFILL_AT = .35;      // 墨量低於這個值（筆跡約呈灰褐色）就出現紅字提示，可提前點墨硯補墨
+const REFILL_AT = .6;       // 墨量低於這個值（筆跡開始變淡、還沒出現飛白）就出現紅字提示，可提前點墨硯補墨
 const DRY_START = .5;       // 墨量低於這個值開始出現飛白
 let usedBefore = 0;         // 本次沾墨後，已定稿的字用掉的長度
 const pathLen = list => list.reduce((sum, st) => sum + st.reduce((l, p, i) => i ? l + Math.hypot(p.x - st[i - 1].x, p.y - st[i - 1].y) : l, 0), 0);
@@ -207,7 +207,7 @@ function updateInkUI() {
   $('ink').classList.toggle('needs-ink', (dry || out) && !$('ink').disabled);
   $('inkInfo').classList.toggle('dry', dry || out);
   if (inked) $('inkInfo').textContent = dry
-    ? '墨快乾了，可以點墨硯補墨'
+    ? '墨變淡了，可以點墨硯補墨'
     : (refilled ? '墨已補滿，用完可再補' : '');
   else if (out) $('inkInfo').textContent = '墨用完了，記得點墨硯補墨';
 }
@@ -380,6 +380,7 @@ const SCRIBBLE_STROKE_W = 30, SCRIBBLE_FROM = 2.5, SCRIBBLE_TO = 5;   // 亂寫�
 const CHANCE_F1 = .25;   // 隨便畫幾條線經過底字，F1 也有兩三成（底字筆畫粗、墨也有寬度）；這部分視為碰巧蓋到，不算分
 const ORDER_NEAR = 34;   // 標準筆畫中心線上的點，距離你的筆跡在這個範圍內才算「寫到」
 const ORDER_BONUS = .15; // 筆順全對時，每字最多加的比例（只加分，不扣分）
+const STRICT_FROM = .7, STRICT_POW = 1.5;   // 單字分超過 0.7 後改用曲線：越接近滿分越難拿（0.8→0.76、0.9→0.86、0.95→0.93），0.7 以下不變
 
 /* 依固定間距重取樣：保留順序，讓快筆（點很稀）也能比對 */
 function resample(poly, step) {
@@ -436,7 +437,8 @@ function assess() {
   const skill = Math.max(0, (f1 - CHANCE_F1) / (1 - CHANCE_F1)) * (1 - .8 * tangle);
   const order = assessOrder();
   /* 筆順加分跟著形狀好壞走：形狀分數不到 0.5 時按比例縮小，亂畫就算碰巧順序對也拿不到 */
-  const value = Math.min(1, skill + (order ? ORDER_BONUS * order.order * Math.min(1, skill / .5) : 0));
+  const raw = Math.min(1, skill + (order ? ORDER_BONUS * order.order * Math.min(1, skill / .5) : 0));
+  const value = raw <= STRICT_FROM ? raw : STRICT_FROM + (1 - STRICT_FROM) * Math.pow((raw - STRICT_FROM) / (1 - STRICT_FROM), STRICT_POW);
   return { coverage, precision, f1, ratio, order, value };
 }
 
@@ -522,11 +524,17 @@ function caption() {
    分享圖卡（1080×1350）：作品為主角，成績與評價一起留在圖卡上
    ========================================================================== */
 let cardVersion = 0;
+/* 繪卷底圖（asset/scroll.webp，由 data/ui/classical-horizontal-scroll-blank.png 裁切縮小）與其中可寫字的紙面範圍（像素） */
+const SCROLL = { w: 1400, h: 371, px: 76, py: 40, pw: 1254, ph: 277 };
+const scrollImg = new Image();
+scrollImg.src = 'asset/scroll.webp';
+const scrollReady = scrollImg.decode().then(() => true, () => false);
+
 async function drawCard() {
   if (!saved.length) return;
   const version = ++cardVersion;
   shareFile = null;
-  await Promise.all([document.fonts.load('30px Hakka'), document.fonts.load('60px StampBrush', '墨')]);
+  const [, , scrollOk] = await Promise.all([document.fonts.load('30px Hakka'), document.fonts.load('60px StampBrush', '墨'), scrollReady]);
   if (version !== cardVersion) return;
   const c = $('card'), g = c.getContext('2d');
   c.width = 1080; c.height = 1350;
@@ -541,9 +549,18 @@ async function drawCard() {
   g.fillStyle = '#78664a'; g.font = '26px Hakka';
   g.fillText(`${names[$('dialect').value]} · 第 ${question.level} 級 · ${question.category}`, 540, 318, 900);
 
-  g.fillStyle = '#fffdf7'; g.fillRect(75, 360, 930, 250);
-  g.strokeStyle = '#e0d4bb'; g.lineWidth = 2; g.strokeRect(75, 360, 930, 250);
-  saved.forEach((s, i) => g.drawImage(s.canvas, 85 + i * 182, 394, 182, 182));
+  if (scrollOk) {
+    /* 五個字寫在繪卷的紙面上；字稿四周留白裁掉一圈，字才夠大 */
+    const W = 960, k = W / SCROLL.w, x0 = (1080 - W) / 2, y0 = 352;
+    g.drawImage(scrollImg, x0, y0, W, SCROLL.h * k);
+    const pw = SCROLL.pw * k, ph = SCROLL.ph * k, box = Math.min(pw / 5, ph) * .96;
+    const px = x0 + SCROLL.px * k + (pw - box * 5) / 2, py = y0 + SCROLL.py * k + (ph - box) / 2;
+    saved.forEach((s, i) => g.drawImage(s.canvas, 36, 36, 440, 440, px + i * box, py, box, box));
+  } else {
+    g.fillStyle = '#fffdf7'; g.fillRect(75, 360, 930, 250);
+    g.strokeStyle = '#e0d4bb'; g.lineWidth = 2; g.strokeRect(75, 360, 930, 250);
+    saved.forEach((s, i) => g.drawImage(s.canvas, 85 + i * 182, 394, 182, 182));
+  }
 
   g.fillStyle = '#3b3a2d'; g.font = '40px Hakka'; g.fillText(question.hakka_hanji, 540, 684, 900);
   g.fillStyle = '#55574a'; g.font = '27px Hakka'; g.fillText(question.chinese_sentence || '', 540, 736, 900);
