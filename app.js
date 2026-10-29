@@ -27,7 +27,7 @@ const FEEDBACK_LINES = {
 const pick = list => list[Math.floor(Math.random() * list.length)];
 
 /* ==========================================================================
-   作品紀念章：依描寫得分分六階段（含 2 分以下的亂寫章），各有不同章名與印章造型。
+   作品紀念章：依筆墨得分分六階段（含 2 分以下的亂寫章），各有不同章名與印章造型。
    門檻為暫定值（計分尚未用真實學生作品校準），之後只需要改這張表。
    style：circle 單線圓章／splash 墨花不規則圓章／square 方章／double 雙線方章／cloud 雲紋邊方章／gold 金邊雙框章
    ========================================================================== */
@@ -567,7 +567,7 @@ async function drawCard() {
 
   g.fillStyle = '#e7e5d4'; g.fillRect(90, 790, 900, 205);
   g.fillStyle = '#78664a'; g.font = '22px Hakka';
-  g.fillText('描寫得分', 315, 842); g.fillText('描寫時間', 765, 842);
+  g.fillText('筆墨得分', 315, 842); g.fillText('揮毫時間', 765, 842);
   g.strokeStyle = '#c9bfa5'; g.lineWidth = 2; g.beginPath(); g.moveTo(540, 825); g.lineTo(540, 905); g.stroke();
   g.fillStyle = '#355b4d'; g.font = '52px Hakka';
   g.fillText(`${score.toFixed(2)} / 10`, 315, 902); g.fillText(time(ended - started), 765, 902);
