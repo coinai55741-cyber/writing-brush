@@ -37,7 +37,7 @@ const STAMPS = [
   { min: 6,   name: '運筆漸穩', line: '筆畫愈來愈穩',       style: 'double' },
   { min: 4,   name: '墨字初成', line: '字形出來了',         style: 'square' },
   { min: 2,   name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' },
-  { min: 0,   name: '墨花亂舞', line: '筆下好熱鬧，下次慢慢描', style: 'splash' }   // 2 分以下，多半是亂寫
+  { min: 0,   name: '墨花亂舞', line: '筆下好熱鬧，請再接再厲！', style: 'splash' }   // 2 分以下，多半是亂寫
 ];
 const stampFor = value => STAMPS.find(st => value >= st.min);
 
@@ -106,10 +106,28 @@ function drawStamp(g, cx, cy, size, st) {
 /* ==========================================================================
    描寫
    ========================================================================== */
+/* 筆畫資料（strokes/strokes.json，由 tools/build_strokes.py 產生）：每字的筆畫輪廓與中心線，座標為 1024 字格。
+   底字範本用這份輪廓畫出，筆順也用同一份中心線比對；查不到的字退回字型底字、不算筆順。 */
+let STROKE_DATA = null;
+const strokesReady = fetch('strokes/strokes.json').then(r => r.json()).then(d => { STROKE_DATA = d; }).catch(() => { STROKE_DATA = null; });
+const GS = .38, GO = (512 - 1024 * GS) / 2;                 // 1024 字格縮放到畫布的比例與左上角位置
+const toCanvas = ([x, y]) => ({ x: GO + GS * x, y: GO + GS * (900 - y) });   // 資料座標 y 軸朝上，字格上緣在 900
+const glyphCache = new Map();
+
 function target() {
-  const c = makeCanvas(), g = c.getContext('2d');
-  g.fillStyle = '#000'; g.font = '330px Hakka'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(chars[index] || '', 256, 273);
+  const ch = chars[index] || '';
+  if (glyphCache.has(ch)) return glyphCache.get(ch);
+  const c = makeCanvas(), g = c.getContext('2d'), sd = STROKE_DATA && STROKE_DATA[ch];
+  g.fillStyle = '#000';
+  if (sd) {
+    g.setTransform(GS, 0, 0, -GS, GO, GO + 900 * GS);
+    for (const p of sd.s) g.fill(new Path2D(p));
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  } else {
+    g.font = '330px Hakka'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(ch, 256, 273);
+  }
+  glyphCache.set(ch, c);
   return c;
 }
 
@@ -137,12 +155,12 @@ function paintStroke(g, s, fixed = false) {
   g.strokeStyle = g.fillStyle = fixed ? '#24221d' : inkColor(s[0].k ?? 1);
   g.lineCap = g.lineJoin = 'round';
   if (s.length === 1) {
-    g.beginPath(); g.arc(s[0].x, s[0].y, fixed ? 10 : 3, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(s[0].x, s[0].y, fixed ? SCORE_W / 2 : 3, 0, Math.PI * 2); g.fill();
     return;
   }
   if (fixed) {
     for (let i = 1; i < s.length; i++) {
-      g.lineWidth = 20;
+      g.lineWidth = SCORE_W;
       g.beginPath(); g.moveTo(s[i - 1].x, s[i - 1].y); g.lineTo(s[i].x, s[i].y); g.stroke();
     }
     return;
@@ -182,12 +200,14 @@ function updateInkUI() {
   brush.classList.toggle('inked', inked);
   brush.style.setProperty('--ink', inked ? (.35 + .65 * lvl).toFixed(2) : 0);
   $('inkBar').style.width = (lvl * 100).toFixed(0) + '%';
-  $('ink').classList.toggle('needs-ink', !inked && !!started && !ended && !$('ink').disabled);
   const dry = inked && lvl < .3, out = !inked && !!started && !ended;
+  if (dry && !loading) $('ink').disabled = active !== null;   // 墨快乾（出現紅字）時就可以提前補墨，不必等用完
+  else if (inked) $('ink').disabled = true;
+  $('ink').classList.toggle('needs-ink', (dry || out) && !$('ink').disabled);
   $('inkInfo').classList.toggle('dry', dry || out);
   if (inked) $('inkInfo').textContent = dry
-    ? '墨快乾了，用完記得點墨硯補墨'
-    : (refilled ? '墨已補滿，用完可再補' : '墨用完再補，次數不限');
+    ? '墨快乾了，可以點墨硯補墨'
+    : (refilled ? '墨已補滿，用完可再補' : '');
   else if (out) $('inkInfo').textContent = '墨用完了，記得點墨硯補墨';
 }
 
@@ -230,7 +250,7 @@ async function loadQuestion() {
   $('ink').disabled = $('audio').disabled = $('drawQuestion').disabled = $('dialect').disabled = true;
   $('status').textContent = '正在載入題目與字型…';
   try {
-    await Promise.all([document.fonts.load('330px Hakka'), document.fonts.load('60px StampBrush', '墨')]);
+    await Promise.all([document.fonts.load('330px Hakka'), document.fonts.load('60px StampBrush', '墨'), strokesReady]);
     const lists = await Promise.all([1, 2, 3, 4, 5].map(async n => {
       const r = await fetch(`data/quiz/questions_dialect_${$('dialect').value}_level_${n}.json`);
       if (!r.ok) throw Error();
@@ -248,7 +268,7 @@ async function loadQuestion() {
     $('status').textContent = '';
     $('paperHint').textContent = '先點墨硯，再開始下筆';
     $('inkLabel').textContent = '沾墨開始';
-    $('inkInfo').textContent = '墨用完再補，次數不限';
+    $('inkInfo').textContent = '';
     $('ink').disabled = false; $('audio').disabled = false;
     render();
     autoplay();
@@ -264,7 +284,7 @@ function tick() {
 }
 
 $('ink').onclick = () => {
-  if (loading || inked) return;
+  if (loading || active !== null || (inked && inkLevel() >= .3)) return;
   inked = true;
   if (!started) { started = performance.now(); $('drawQuestion').disabled = true; $('dialect').disabled = true; tick(); }
   else refilled = true;
@@ -354,10 +374,51 @@ paper.onpointerup = paper.onpointercancel = paper.onlostpointercapture = release
 $('undo').onclick = () => { strokes.pop(); render(); };
 $('clear').onclick = () => { strokes = []; render(); };
 
-const SCRIBBLE_STROKE_W = 24, SCRIBBLE_FROM = 2.5, SCRIBBLE_TO = 5;   // 亂寫偵測：路徑長度倍數 2.5 起扣分，5 倍以上扣到最重
-const LOOSE_LOW = .2, LOOSE_HIGH = .45;                               // 與底字重疊度（F1）太低時額外扣分
+const SCORE_W = 20;      // 計分用的固定筆寬（畫布單位），與畫面上筆寬無關
+const SCRIBBLE_STROKE_W = 30, SCRIBBLE_FROM = 2.5, SCRIBBLE_TO = 5;   // 亂寫偵測：路徑長度倍數 2.5 起扣分，5 倍以上扣到最重
+const CHANCE_F1 = .25;   // 隨便畫幾條線經過底字，F1 也有兩三成（底字筆畫粗、墨也有寬度）；這部分視為碰巧蓋到，不算分
+const ORDER_NEAR = 34;   // 標準筆畫中心線上的點，距離你的筆跡在這個範圍內才算「寫到」
+const ORDER_BONUS = .15; // 筆順全對時，每字最多加的比例（只加分，不扣分）
 
-/* 評分：描寫墨跡（固定線寬）與標準底字比較，覆蓋率與精準度取調和平均；不辨識筆順。 */
+/* 依固定間距重取樣：保留順序，讓快筆（點很稀）也能比對 */
+function resample(poly, step) {
+  const out = [poly[0]];
+  for (let i = 1; i < poly.length; i++) {
+    const a = poly[i - 1], b = poly[i], n = Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / step);
+    for (let k = 1; k <= n; k++) out.push({ x: a.x + (b.x - a.x) * k / (n + 1), y: a.y + (b.y - a.y) * k / (n + 1) });
+    out.push(b);
+  }
+  return out;
+}
+
+/* 筆順：把標準每一筆的中心線，對到你的筆跡上「最近的一點」，以那一點在整個書寫過程中的先後當作這一筆的時間；
+   再看標準順序裡每一對筆畫，你是否也是先寫前一筆。沒寫到的筆畫（距離太遠）不列入；不看筆畫方向。
+   查無筆畫資料或寫到的筆畫少於 2 筆時回傳 null。 */
+function assessOrder() {
+  const sd = STROKE_DATA && STROKE_DATA[chars[index]];
+  if (!sd || sd.m.length < 2) return null;
+  const pts = strokes.flatMap(st => resample(st, 4));
+  if (pts.length < 2) return null;
+  const times = [];
+  sd.m.forEach(m => {
+    const ref = resample(m.map(toCanvas), 14).filter((_, i, a) => i % Math.max(1, Math.floor(a.length / 10)) === 0);
+    const hit = [];
+    for (const q of ref) {
+      let best = Infinity, at = -1;
+      for (let k = 0; k < pts.length; k++) { const d = Math.hypot(pts[k].x - q.x, pts[k].y - q.y); if (d < best) { best = d; at = k; } }
+      if (best <= ORDER_NEAR) hit.push(at);
+    }
+    if (hit.length >= ref.length * .6) { hit.sort((x, y) => x - y); times.push(hit[hit.length >> 1]); }
+    else times.push(null);
+  });
+  const done = times.filter(t => t !== null);
+  if (done.length < 2) return null;
+  let right = 0, pairs = 0;
+  for (let i = 0; i < done.length; i++) for (let j = i + 1; j < done.length; j++) { pairs++; if (done[i] <= done[j]) right++; }
+  return { order: right / pairs, covered: done.length, total: sd.m.length };
+}
+
+/* 評分：描寫墨跡（固定線寬）與標準底字比較，覆蓋率與精準度取調和平均；筆順正確再加一點分。 */
 function assess() {
   const t = target().getContext('2d').getImageData(0, 0, 512, 512).data;
   const m = inkCanvas(true).getContext('2d').getImageData(0, 0, 512, 512).data;
@@ -371,8 +432,11 @@ function assess() {
   /* 亂寫偵測：筆畫總長相對底字所需長度（底字面積 ÷ 筆畫粗細）。正常描寫約 1～2 倍；來回塗抹、打圈會高出許多。 */
   const ratio = goal ? pathLen(strokes) / (goal / SCRIBBLE_STROKE_W) : 0;
   const tangle = Math.max(0, Math.min(1, (ratio - SCRIBBLE_FROM) / (SCRIBBLE_TO - SCRIBBLE_FROM)));
-  const loose = Math.max(0, Math.min(1, (f1 - LOOSE_LOW) / (LOOSE_HIGH - LOOSE_LOW)));
-  return { coverage, precision, f1, ratio, value: f1 * (1 - .8 * tangle) * (.4 + .6 * loose) };
+  const skill = Math.max(0, (f1 - CHANCE_F1) / (1 - CHANCE_F1)) * (1 - .8 * tangle);
+  const order = assessOrder();
+  /* 筆順加分跟著形狀好壞走：形狀分數不到 0.5 時按比例縮小，亂畫就算碰巧順序對也拿不到 */
+  const value = Math.min(1, skill + (order ? ORDER_BONUS * order.order * Math.min(1, skill / .5) : 0));
+  return { coverage, precision, f1, ratio, order, value };
 }
 
 $('next').onclick = () => {
@@ -396,6 +460,8 @@ function finish() {
   $('practice').hidden = true; $('result').hidden = false;
   $('feedback').textContent = feedback;
   $('elapsed').textContent = time(ended - started);
+  const orders = saved.filter(v => v.order).map(v => v.order.order);
+  $('orderRate').textContent = orders.length ? `${Math.round(orders.reduce((x, y) => x + y, 0) / orders.length * 100)}%` : '—';
   $('artwork').replaceChildren(...saved.map(s => { const c = makeCanvas(); c.getContext('2d').drawImage(s.canvas, 0, 0); return c; }));
   $('resultSentence').textContent = question.hakka_hanji;
   $('resultMeaning').textContent = question.chinese_sentence || '';
@@ -554,7 +620,7 @@ async function shareImageOnly(platform) {
   if (navigator.canShare?.({ files: [shareFile] })) {
     try {
       await navigator.share({ files: [shareFile] });
-      $('shareStatus').textContent = '已交給分享介面；是否發文由你決定。';
+      $('shareStatus').textContent = '';
     } catch (e) {
       $('shareStatus').textContent = e.name === 'AbortError' ? '已取消分享，作品仍保留。' : '分享未完成，請改用「下載作品圖」。';
     }

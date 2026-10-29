@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#355b4d">
 <title>阿黑・墨字小試</title>
-<link rel="stylesheet" href="style.css?v=20261029-ink">
+<link rel="stylesheet" href="style.css?v=20261029-order">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -80,7 +80,7 @@
           <b id="inkLabel">沾墨開始</b>
           <span class="ink-meter" aria-hidden="true"><i id="inkBar"></i></span>
         </button>
-        <p id="inkInfo">墨用完再補，次數不限</p>
+        <p id="inkInfo"></p>
         <button id="undo" type="button" disabled>撤回一筆</button>
         <button id="clear" type="button" disabled>重寫這個字</button>
         <button id="next" type="button" class="primary" disabled>寫好，下一字 →</button>
@@ -100,6 +100,7 @@
     <div class="metrics">
       <div><small>描寫得分</small><strong id="score"></strong></div>
       <div><small>描寫時間</small><strong id="elapsed"></strong></div>
+      <div><small>筆順</small><strong id="orderRate"></strong></div>
       <div class="stamp-tile"><small>作品紀念章</small><strong id="stampName"></strong><em id="stampLine"></em></div>
     </div>
 
@@ -137,13 +138,12 @@
         </div>
 
         <p id="shareStatus" role="status"></p>
-        <p class="note">作品紀念章依描寫得分分為五階段。分享獎勵尚未啟用，開啟分享不代表已發文。</p>
       </div>
     </div>
 
     <div class="restart-row"><button id="restart" type="button">再描一次</button></div>
   </section>
 </main>
-<script src="app.js?v=20261029-ink"></script>
+<script src="app.js?v=20261029-order"></script>
 </body>
 </html>
