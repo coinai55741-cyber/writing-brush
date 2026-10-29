@@ -22,7 +22,7 @@ const FEEDBACK_LINES = {
   high: ['筆畫完整，落筆也很穩！'],
   mid: ['字形已經出來了！下次試著讓筆跡更貼近底字。'],
   low: ['五個字完成了！下次把漏掉的筆畫再補齊。'],
-  scribble: ['筆畫有點亂喔！下次放慢速度，沿著底字一筆一畫描。']
+  scribble: ['筆畫有點亂喔！下次放慢速度，沿著底字一筆一畫寫。']
 };
 const pick = list => list[Math.floor(Math.random() * list.length)];
 
@@ -104,7 +104,7 @@ function drawStamp(g, cx, cy, size, st) {
 }
 
 /* ==========================================================================
-   描寫
+   書寫
    ========================================================================== */
 /* 筆畫資料（strokes/strokes.json，由 tools/build_strokes.py 產生）：每字的筆畫輪廓與中心線，座標為 1024 字格。
    底字範本用這份輪廓畫出，筆順也用同一份中心線比對；查不到的字退回字型底字、不算筆順。 */
@@ -293,13 +293,13 @@ $('ink').onclick = () => {
   usedBefore = -pathLen(strokes);   // 補墨可能發生在一個字寫到一半，目前字已寫的長度不再扣墨
   dipBrush();
   $('inkLabel').textContent = '墨已備好';
-  $('paperHint').textContent = '按住描寫，放開收筆';
-  $('status').textContent = refilled ? '墨已補滿，繼續描寫。' : '可以下筆了。慢寫稍粗、快寫稍細。';
+  $('paperHint').textContent = '按住書寫，放開收筆';
+  $('status').textContent = refilled ? '墨已補滿，繼續書寫。' : '可以下筆了。慢寫稍粗、快寫稍細。';
   render();
 };
 
 /* ==========================================================================
-   毛筆圖象：跟著游標／手指，筆尖落在描寫位置。
+   毛筆圖象：跟著游標／手指，筆尖落在書寫位置。
    沒沾墨時筆毛是淺色，沾墨後筆尖變黑；下筆時依筆寬讓筆尖張開或收攏。
    ========================================================================== */
 const BRUSH_SVG = `<svg viewBox="0 0 44 230" aria-hidden="true" focusable="false">
@@ -420,7 +420,7 @@ function assessOrder() {
   return { order: right / pairs, covered: done.length, total: sd.m.length };
 }
 
-/* 評分：描寫墨跡（固定線寬）與標準底字比較，覆蓋率與精準度取調和平均；筆順正確再加一點分。 */
+/* 評分：書寫墨跡（固定線寬）與標準底字比較，覆蓋率與精準度取調和平均；筆順正確再加一點分。 */
 function assess() {
   const t = target().getContext('2d').getImageData(0, 0, 512, 512).data;
   const m = inkCanvas(true).getContext('2d').getImageData(0, 0, 512, 512).data;
@@ -431,7 +431,7 @@ function assess() {
   }
   const coverage = goal ? hit / goal : 0, precision = drawn ? hit / drawn : 0;
   const f1 = coverage + precision ? 2 * coverage * precision / (coverage + precision) : 0;
-  /* 亂寫偵測：筆畫總長相對底字所需長度（底字面積 ÷ 筆畫粗細）。正常描寫約 1～2 倍；來回塗抹、打圈會高出許多。 */
+  /* 亂寫偵測：筆畫總長相對底字所需長度（底字面積 ÷ 筆畫粗細）。正常書寫約 1～2 倍；來回塗抹、打圈會高出許多。 */
   const ratio = goal ? pathLen(strokes) / (goal / SCRIBBLE_STROKE_W) : 0;
   const tangle = Math.max(0, Math.min(1, (ratio - SCRIBBLE_FROM) / (SCRIBBLE_TO - SCRIBBLE_FROM)));
   const skill = Math.max(0, (f1 - CHANCE_F1) / (1 - CHANCE_F1)) * (1 - .8 * tangle);
@@ -445,13 +445,13 @@ function assess() {
 $('next').onclick = () => {
   if (active !== null || !strokes.length) return;
   const evaluation = assess();
-  if (evaluation.coverage < .12) { $('status').textContent = '底字還有很多地方沒描到，先補上主要筆畫，再往下一字。'; return; }
+  if (evaluation.coverage < .12) { $('status').textContent = '底字還有很多地方沒寫到，先補上主要筆畫，再寫下一字。'; return; }
   saved.push({ canvas: inkCanvas(), ...evaluation });
   if (index === 4) { ended = performance.now(); cancelAnimationFrame(timerId); $('timer').textContent = time(ended - started); finish(); return; }
   usedBefore += pathLen(strokes);
   index++; strokes = [];
   if (inkLeft() <= 0) needRefill();
-  else $('status').textContent = `正在描第 ${index + 1} 個字。`;
+  else $('status').textContent = `正在寫第 ${index + 1} 個字。`;
   render();
 };
 
@@ -515,7 +515,7 @@ function caption() {
     '我用毛筆學客語！',
     `【${names[$('dialect').value]}】${question.hakka_hanji}`,
     question.chinese_sentence || '',
-    `描寫 ${score.toFixed(2)} / 10 分 · ${time(ended - started)}`,
+    `書寫 ${score.toFixed(2)} / 10 分 · ${time(ended - started)}`,
     feedback
   ].filter(Boolean).join('\n');
 }
