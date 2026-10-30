@@ -82,7 +82,6 @@ main { max-width: 1060px; margin: 0 auto; padding: 32px 24px 72px; }
 
 .eyebrow { color: var(--brown); font-size: 13px; letter-spacing: 2px; }
 .lead { color: #55574a; }
-.note { color: var(--muted); font-size: 13px; line-height: 1.7; }
 .meaning { color: #55574a; }
 
 /* ---------- 按鈕與表單 ---------- */
@@ -221,7 +220,6 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 .brush .bristles { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleX(var(--spread)); transition: transform .08s; }
 
 #status { margin-top: 16px; min-height: 1.75em; color: #4d4a3d; }
-.note { margin-top: 6px; }
 
 /* ---------- 結果頁 ---------- */
 .result-hero { text-align: center; }
@@ -304,7 +302,6 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 .social-button.instagram .social-icon { background: linear-gradient(45deg, #f9a03f, #e4405f 55%, #8a3ab9); }
 
 #shareStatus { min-height: 1.75em; margin-top: 16px; color: var(--green); font-size: 14px; font-weight: 700; }
-.share-panel .note { margin-top: 4px; }
 
 .restart-row { margin-top: 34px; text-align: center; }
 .restart-row button { min-width: 180px; }

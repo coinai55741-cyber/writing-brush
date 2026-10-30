@@ -518,7 +518,8 @@ function finish() {
   $('feedback').textContent = feedback;
   $('elapsed').textContent = time(ended - started);
   const orders = saved.filter(v => v.order).map(v => v.order.order);
-  $('orderRate').textContent = orders.length ? `${Math.round(orders.reduce((x, y) => x + y, 0) / orders.length * 100)}%` : '—';
+  const orderAvg = orders.length ? orders.reduce((x, y) => x + y, 0) / orders.length : null;
+  $('orderRate').textContent = orderAvg === null ? '—' : `${Math.round(orderAvg * 100)}%`;
   $('artwork').replaceChildren(...saved.map(s => { const c = makeCanvas(); c.getContext('2d').drawImage(s.canvas, 0, 0); return c; }));
   $('resultSentence').textContent = question.hakka_hanji;
   $('resultMeaning').textContent = question.chinese_sentence || '';
@@ -531,12 +532,11 @@ function finish() {
   drawCard();
   if (!embedded) playSettle();
   if (embedded && window.parent !== window) {
-    const orderValues = saved.filter(v => v.order).map(v => v.order.order);
     window.parent.postMessage({
       type: 'brush-complete',
       score: Number(score.toFixed(2)),
       writingElapsedMs: Math.max(0, ended - started),
-      orderRate: orderValues.length ? Number((orderValues.reduce((x, y) => x + y, 0) / orderValues.length).toFixed(4)) : null,
+      orderRate: orderAvg === null ? null : Number(orderAvg.toFixed(4)),
       stampName: stamp.name,
       question: { hakka_hanji: question.hakka_hanji, chinese_sentence: question.chinese_sentence || '', dialect: $('dialect').value }
     }, hostOrigin);
