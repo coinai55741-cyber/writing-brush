@@ -390,3 +390,31 @@ body.embedded .restart-row { display: none; }
   body.embedded #status { margin-top: 6px; }
   body.embedded #next { margin-top: 22px; }
 }
+
+/* 手機直式：墨硯、撤回、重寫、下一字固定在畫面上方（sticky），
+   寫字時不用再往上捲動找墨硯——以前在書寫區上拖曳往上捲，會不小心畫出筆跡。
+   .desk 改成一般區塊排版（sticky 在格線裡只能待在自己的格子），overflow 用 clip 才不會變成捲動容器。 */
+@media (max-width: 720px) and (min-height: 501px) {
+  html { touch-action: manipulation; }
+  .desk { display: flex; flex-direction: column; overflow: visible; overflow: clip; padding: 0 16px 16px; gap: 0; }
+  .tools {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px;
+    position: sticky; top: 0; z-index: 30;
+    order: -1; margin: 0 -16px 12px; padding: 12px 16px 10px;
+    background: #bda78a; box-shadow: 0 8px 10px -8px rgba(58, 42, 22, .5);
+    border-radius: 0 0 14px 14px;
+  }
+  .tools > *, .tools > #undo, .tools > #clear, .tools > #next, .tools > .inkstone, .tools > p { grid-area: auto; }
+  .inkstone {
+    grid-column: 1 / -1; width: 100%; flex-direction: row; align-items: center; justify-content: flex-start;
+    gap: 10px; padding: 2px 6px; min-height: 0;
+  }
+  .stone-wrap { width: 84px; flex: none; }
+  .inkstone .dip-brush { width: 12px; height: 62px; }
+  .inkstone b { flex: none; font-size: 14px; }
+  .ink-meter { flex: 1; width: auto; }
+  .tools p { grid-column: 1 / -1; order: 5; margin: 0; min-height: 0; }
+  .tools p:empty { display: none; }
+  .paper { margin: 0; }
+  .tools > .inkstone, .tools > p { grid-column: 1 / -1; }
+}
