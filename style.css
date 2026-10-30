@@ -27,6 +27,20 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+html {
+  scrollbar-color: #315b48 #e7dfcf;
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar { width: 12px; }
+html::-webkit-scrollbar-track { background: #e7dfcf; }
+html::-webkit-scrollbar-thumb {
+  border: 3px solid #e7dfcf;
+  border-radius: 999px;
+  background: #315b48;
+}
+html::-webkit-scrollbar-thumb:hover { background: #274b3b; }
+
 body {
   margin: 0;
   color: var(--ink);
@@ -302,16 +316,20 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 }
 
 @media (max-width: 720px) {
-  .desk { grid-template-columns: minmax(0, 512px); padding: 16px; gap: 16px; }
-  .tools {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    grid-template-areas: "ink info" "undo clear" "next next";
+  /* 窄螢幕：墨硯、撤回、重寫放在書寫區上方，「寫好，下一字」留在書寫區下方。
+     .tools 用 display: contents 讓裡面的元件直接加入 .desk 的格線，才能一上一下分開排。 */
+  .desk {
+    grid-template-columns: repeat(2, minmax(0, 248px)); padding: 16px; gap: 16px;
+    grid-template-areas: "ink info" "undo clear" "paper paper" "next next";
   }
+  .tools { display: contents; }
   .tools p { grid-area: info; align-self: center; }
   .inkstone { grid-area: ink; }
   #undo { grid-area: undo; }
   #clear { grid-area: clear; }
-  #next { grid-area: next; }
+  .paper { grid-area: paper; }
+  /* 下一字離書寫區、撤回／重寫都拉開，手指寫到紙邊緣時不會誤按。 */
+  #next { grid-area: next; margin-top: 28px; min-height: 52px; }
 }
 
 @media (max-width: 640px) {
@@ -358,13 +376,16 @@ body.embedded .restart-row { display: none; }
   body.embedded .steps { margin-top: 6px; }
   body.embedded .step { width: 34px; height: 34px; font-size: 17px; }
   body.embedded .desk {
+    grid-template-areas: none;
     grid-template-columns: minmax(0, 360px) 190px;
     gap: 16px;
     margin-top: 8px;
     padding: 12px;
   }
+  body.embedded .paper { grid-area: auto; }
   body.embedded .tools { display: flex; gap: 7px; }
+  body.embedded .tools p, body.embedded .inkstone, body.embedded #undo, body.embedded #clear, body.embedded #next { grid-area: auto; }
   body.embedded .tools button:not(.inkstone) { min-height: 38px; padding: 6px 10px; }
   body.embedded #status { margin-top: 6px; }
+  body.embedded #next { margin-top: 22px; }
 }
-

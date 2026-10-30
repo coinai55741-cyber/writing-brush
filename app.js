@@ -9,10 +9,35 @@ const paper = $('paper'), ctx = paper.getContext('2d');
 const makeCanvas = () => { const c = document.createElement('canvas'); c.width = c.height = 512; return c; };
 let question, chars = [], index = 0, strokes = [], saved = [], started = 0, ended = 0, active = null;
 let inked = false, refilled = false, loading = false, loadToken = 0, shareFile = null;
+const BRUSH_MAX = 20;   // 毛筆滿分（與主遊戲 BRUSH_MAX_SCORE 一致）
 let score = 0, feedback = '', timerId = 0, stamp = null;
 if (embedded) document.body.classList.add('embedded');
 if (hostDialect && $('dialect').querySelector(`option[value="${CSS.escape(hostDialect)}"]`)) $('dialect').value = hostDialect;
 const audio = new Audio();
+
+/* 音效：檔案放在本專案的 data/music/。
+   右上角的喇叭按鈕只關背景音樂，這些操作音效不受影響。 */
+const SFX_BASE = 'data/music/', SFX_VER = '20261030-3';
+function playSfx(name, volume = .75) {
+  const a = new Audio(`${SFX_BASE}${name}.mp3?v=${SFX_VER}`);
+  a.volume = volume; a.play().catch(() => {});
+}
+/* 寫字聲：循環的沙沙聲，筆動得越快越大聲，停住就收聲 */
+const writeLoop = new Audio(`${SFX_BASE}S2_m3_write.mp3?v=${SFX_VER}`);
+writeLoop.loop = true; writeLoop.volume = 0;
+let writeVol = 0;
+function startWriteSound() { writeVol = 0; writeLoop.volume = 0; writeLoop.play().catch(() => {}); }
+function moveWriteSound(speed) {   // speed：畫布單位 / 毫秒
+  const target = speed < .04 ? 0 : Math.min(.8, .18 + speed * .55);
+  writeVol += (target - writeVol) * .4;
+  writeLoop.volume = Math.max(0, Math.min(1, writeVol));
+}
+function stopWriteSound() { writeLoop.pause(); writeLoop.currentTime = 0; writeVol = 0; }
+/* 一般按鈕的按下聲（沾墨有自己的音效） */
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button');
+  if (b && b.id !== 'ink' && !b.disabled) playSfx('S2_m2_click');
+});
 const clean = s => Array.from(s.replace(/[\p{P}\p{Z}\s]/gu, ''));
 const time = ms => {
   const t = Math.floor(ms / 10);
@@ -38,11 +63,11 @@ const pick = list => list[Math.floor(Math.random() * list.length)];
    style：circle 單線圓章／splash 墨花不規則圓章／square 方章／double 雙線方章／cloud 雲紋邊方章／gold 金邊雙框章
    ========================================================================== */
 const STAMPS = [
-  { min: 9,   name: '墨韻客家', line: '字裡有客家的味道',   style: 'gold' },
-  { min: 7.5, name: '落筆生輝', line: '每一筆都有精神',     style: 'cloud' },
-  { min: 6,   name: '運筆漸穩', line: '筆畫愈來愈穩',       style: 'double' },
-  { min: 4,   name: '墨字初成', line: '字形出來了',         style: 'square' },
-  { min: 2,   name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' },
+  { min: .9 * BRUSH_MAX,   name: '墨韻客家', line: '字裡有客家的味道',   style: 'gold' },
+  { min: .75 * BRUSH_MAX, name: '落筆生輝', line: '每一筆都有精神',     style: 'cloud' },
+  { min: .6 * BRUSH_MAX,  name: '運筆漸穩', line: '筆畫愈來愈穩',       style: 'double' },
+  { min: .4 * BRUSH_MAX,  name: '墨字初成', line: '字形出來了',         style: 'square' },
+  { min: .2 * BRUSH_MAX,  name: '墨點初試', line: '第一次落筆，已經很棒', style: 'circle' },
   { min: 0,   name: '墨花亂舞', line: '筆下好熱鬧，請再接再厲！', style: 'splash' }   // 2 分以下，多半是亂寫
 ];
 const stampFor = value => STAMPS.find(st => value >= st.min);
@@ -116,7 +141,10 @@ function drawStamp(g, cx, cy, size, st) {
    底字範本用這份輪廓畫出，筆順也用同一份中心線比對；查不到的字退回字型底字、不算筆順。 */
 // Opened from disk (file://) fetch() is blocked and the page origin is opaque: fall back to <script> copies
 // of the data (strokes/strokes.js, data/quiz/questions_offline.js) and postMessage to '*'.
-const hostOrigin = window.location.origin === 'null' ? '*' : window.location.origin;
+// Chrome 在 file:// 下 location.origin 是 'file://'，但 postMessage 的 event.origin 是 'null'，所以兩種情況都要認。
+const isOpaqueOrigin = window.location.protocol === 'file:' || window.location.origin === 'null';
+const hostOrigin = isOpaqueOrigin ? '*' : window.location.origin;
+const isSameOriginMessage = origin => origin === window.location.origin || (isOpaqueOrigin && origin === 'null');
 const loadScript = src => new Promise(resolve => {
   const s = document.createElement('script');
   s.src = src; s.onload = () => resolve(true); s.onerror = () => resolve(false);
@@ -316,7 +344,7 @@ $('ink').onclick = () => {
   else refilled = true;
   $('ink').disabled = true;
   usedBefore = -pathLen(strokes);   // 補墨可能發生在一個字寫到一半，目前字已寫的長度不再扣墨
-  dipBrush();
+  dipBrush(); playSfx('S2_m3_ink');
   $('inkLabel').textContent = '墨已備好';
   $('paperHint').textContent = '按住書寫，放開收筆';
   $('status').textContent = refilled ? '墨已補滿，繼續書寫。' : '可以下筆了。慢寫稍粗、快寫稍細。';
@@ -379,7 +407,7 @@ function point(e) {
 }
 paper.onpointerdown = e => {
   if (!inked || ended || loading || active !== null || !e.isPrimary || e.button !== 0) return;
-  e.preventDefault(); paper.setPointerCapture(e.pointerId); active = e.pointerId; strokes.push([point(e)]); render();
+  e.preventDefault(); paper.setPointerCapture(e.pointerId); active = e.pointerId; strokes.push([point(e)]); startWriteSound(); render();
 };
 paper.onpointermove = e => {
   if (active !== e.pointerId) return;
@@ -387,11 +415,11 @@ paper.onpointermove = e => {
   const s = strokes[strokes.length - 1], p = point(e), a = s[s.length - 1];
   const speed = Math.hypot(p.x - a.x, p.y - a.y) / Math.max(1, p.t - a.t);
   p.w = a.w * .65 + Math.max(7, Math.min(23, 23 - speed * 9)) * .35;
-  s.push(p); render();
+  moveWriteSound(speed); s.push(p); render();
 };
 function release(e) {
   if (active !== e.pointerId) return;
-  active = null;
+  active = null; stopWriteSound();
   /* 墨在一筆中途用完時，這一筆仍可寫完（越寫越淡越細）；收筆後才要求補墨 */
   if (inked && inkLeft() <= 0) needRefill();
   render();
@@ -482,10 +510,11 @@ $('next').onclick = () => {
 
 function finish() {
   audio.pause();
-  score = saved.reduce((s, v) => s + v.value, 0) / 5 * 10;
+  score = saved.reduce((s, v) => s + v.value, 0) / 5 * BRUSH_MAX;
   const coverage = saved.reduce((s, v) => s + v.coverage, 0) / 5;
-  feedback = pick(FEEDBACK_LINES[score >= 8 ? 'high' : score < 2 ? 'scribble' : coverage < .65 ? 'low' : 'mid']);
-  $('practice').hidden = true; $('result').hidden = false;
+  feedback = pick(FEEDBACK_LINES[score >= .8 * BRUSH_MAX ? 'high' : score < .2 * BRUSH_MAX ? 'scribble' : coverage < .65 ? 'low' : 'mid']);
+  // 嵌入遊戲時，成果頁只在主程式排行榜按「查看／分享」才打開；寫完當下維持原畫面讓主程式淡出。
+  if (!embedded) { $('practice').hidden = true; $('result').hidden = false; }
   $('feedback').textContent = feedback;
   $('elapsed').textContent = time(ended - started);
   const orders = saved.filter(v => v.order).map(v => v.order.order);
@@ -500,7 +529,7 @@ function finish() {
   sg.clearRect(0, 0, sc.width, sc.height);
   drawStamp(sg, 120, 120, 220, stamp);
   drawCard();
-  playSettle();
+  if (!embedded) playSettle();
   if (embedded && window.parent !== window) {
     const orderValues = saved.filter(v => v.order).map(v => v.order.order);
     window.parent.postMessage({
@@ -512,7 +541,15 @@ function finish() {
       question: { hakka_hanji: question.hakka_hanji, chinese_sentence: question.chinese_sentence || '', dialect: $('dialect').value }
     }, hostOrigin);
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!embedded) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* 嵌入模式：由主程式要求時才顯示成果頁並重播結算動畫。 */
+function revealResult() {
+  if (!ended) return;
+  $('practice').hidden = true; $('result').hidden = false;
+  playSettle();
+  window.scrollTo(0, 0);
 }
 
 /* 結算動畫：分數跳動計數，接著蓋章。使用者偏好減少動態時直接顯示結果。 */
@@ -520,16 +557,16 @@ let settleToken = 0;
 function playSettle() {
   const token = ++settleToken;
   const stampEl = $('stamp'), card = document.querySelector('.scroll-card'), tile = $('stampName').parentElement;
-  const finalText = `${score.toFixed(2)} / 10`;
+  const finalText = `${score.toFixed(2)} / ${BRUSH_MAX}`;
   stampEl.classList.remove('pre', 'stamp-in'); card.classList.remove('impact'); tile.classList.remove('hold', 'reveal');
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { $('score').textContent = finalText; return; }
   stampEl.classList.add('pre'); tile.classList.add('hold');
-  $('score').textContent = '0.00 / 10';
+  $('score').textContent = `0.00 / ${BRUSH_MAX}`;
   const t0 = performance.now(), DUR = 900;
   const step = now => {
     if (token !== settleToken) return;
     const p = Math.min(1, (now - t0) / DUR), eased = 1 - Math.pow(1 - p, 3);
-    $('score').textContent = p < 1 ? `${(score * eased).toFixed(2)} / 10` : finalText;
+    $('score').textContent = p < 1 ? `${(score * eased).toFixed(2)} / ${BRUSH_MAX}` : finalText;
     if (p < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
@@ -538,7 +575,7 @@ function playSettle() {
     if (token !== settleToken) return;
     void stampEl.offsetWidth;
     stampEl.classList.remove('pre'); stampEl.classList.add('stamp-in');
-    card.classList.add('impact');
+    card.classList.add('impact'); playSfx('S2_m3_stamp');
     tile.classList.remove('hold'); tile.classList.add('reveal');
   }, 1000);
 }
@@ -552,7 +589,7 @@ function caption() {
     `【${names[$('dialect').value]}】${question.hakka_hanji}`,
     hostSummary ? `本關總分：${Number(hostSummary.totalScore).toFixed(2)} / 100` : '',
     question.chinese_sentence || '',
-    `書寫 ${score.toFixed(2)} / 10 分 · ${time(ended - started)}`,
+    `書寫 ${score.toFixed(2)} / ${BRUSH_MAX} 分 · ${time(ended - started)}`,
     feedback
   ].filter(Boolean).join('\n');
 }
@@ -608,7 +645,7 @@ async function drawCard() {
   g.fillText('筆墨得分', 315, 842); g.fillText('揮毫時間', 765, 842);
   g.strokeStyle = '#c9bfa5'; g.lineWidth = 2; g.beginPath(); g.moveTo(540, 825); g.lineTo(540, 905); g.stroke();
   g.fillStyle = '#355b4d'; g.font = '52px Hakka';
-  g.fillText(`${score.toFixed(2)} / 10`, 315, 902); g.fillText(time(ended - started), 765, 902);
+  g.fillText(`${score.toFixed(2)} / ${BRUSH_MAX}`, 315, 902); g.fillText(time(ended - started), 765, 902);
   g.fillStyle = '#3b3a2d'; g.font = '27px Hakka'; g.fillText(feedback, 540, 968, 840);
 
   /* 作品紀念章 */
@@ -710,9 +747,10 @@ $('drawQuestion').onclick = loadQuestion;
 $('dialect').onchange = loadQuestion;
 $('restart').onclick = () => { $('result').hidden = true; $('practice').hidden = false; loadQuestion(); window.scrollTo(0, 0); };
 window.addEventListener('message', event => {
-  if (!embedded || event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== 'brush-session-summary') return;
+  if (!embedded || !isSameOriginMessage(event.origin) || event.source !== window.parent || event.data?.type !== 'brush-session-summary') return;
   hostSummary = event.data;
   drawCard();
+  if (event.data.show) revealResult();
 });
 document.addEventListener('keydown', event => {
   if (!embedded || event.key !== 'Escape' || $('result').hidden) return;
