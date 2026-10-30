@@ -278,7 +278,7 @@ function render() {
   $('undo').disabled = !strokes.length || !!active;
   $('clear').disabled = !strokes.length || !!active;
   $('next').disabled = !strokes.length || !!active;
-  $('next').textContent = index === 4 ? '完成五字，查看成果' : '寫好，下一字 →';
+  $('next').textContent = index === 4 ? '查看成果' : '下一字';
   $('steps').replaceChildren(...chars.map((ch, i) => {
     const e = document.createElement('span');
     e.className = 'step ' + (i === index ? 'active' : i < index ? 'done' : '');

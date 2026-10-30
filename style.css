@@ -316,20 +316,21 @@ button.primary:hover:not(:disabled) { background: #284a3d; }
 }
 
 @media (max-width: 720px) {
-  /* 窄螢幕：墨硯、撤回、重寫放在書寫區上方，「寫好，下一字」留在書寫區下方。
-     .tools 用 display: contents 讓裡面的元件直接加入 .desk 的格線，才能一上一下分開排。 */
+  /* 窄螢幕：墨硯、撤回、重寫、下一字都放在書寫區上方（撤回／重寫／下一字同一列），
+     書寫區下方不放按鈕，手指寫到紙邊緣時不會誤按。
+     .tools 用 display: contents 讓裡面的元件直接加入 .desk 的格線。 */
   .desk {
-    grid-template-columns: repeat(2, minmax(0, 248px)); padding: 16px; gap: 16px;
-    grid-template-areas: "ink info" "undo clear" "paper paper" "next next";
+    grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 16px; gap: 12px;
+    grid-template-areas: "ink ink ink info info info" "undo undo clear clear next next" "paper paper paper paper paper paper";
   }
   .tools { display: contents; }
   .tools p { grid-area: info; align-self: center; }
   .inkstone { grid-area: ink; }
+  #undo, #clear, #next { padding-left: 6px; padding-right: 6px; font-size: 14px; white-space: nowrap; }
   #undo { grid-area: undo; }
   #clear { grid-area: clear; }
+  #next { grid-area: next; }
   .paper { grid-area: paper; }
-  /* 下一字離書寫區、撤回／重寫都拉開，手指寫到紙邊緣時不會誤按。 */
-  #next { grid-area: next; margin-top: 28px; min-height: 52px; }
 }
 
 @media (max-width: 640px) {
