@@ -1,6 +1,6 @@
 @font-face {
   font-family: Hakka;
-  src: url('data/fonts/GenSekiGothic2TW-R.otf');
+  src: url('data/fonts/GenSekiGothic2TW-R.woff2?v=20261031-sub') format('woff2');
   font-display: swap;
 }
 
